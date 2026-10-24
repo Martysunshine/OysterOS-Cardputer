@@ -193,3 +193,242 @@ Cardputer-OysterOS/
 6. Publish screenshots and a traceability matrix: each menu → route → action → handler → result view → automated test.
 
 **Success means functioning architecture and preserved software, not an attractive menu full of dead buttons.**
+
+
+---
+
+## 10. Product specification v0.4 — real end-to-end interactions
+
+This is a **student-scale computer science project** with an incremental usable deliverable. A screen is considered finished only when the route, domain command, physical driver/companion response, and fallback/error state all work.
+
+### 10.1 Event contract and UI navigation wiring
+
+All screens implement a common interface:
+
+```cpp
+struct Screen {
+  void onEnter(const RouteParams&);
+  void handle(const InputEvent&);
+  void update(uint32_t nowMs);
+  void render(Display&);
+  void onExit();
+};
+```
+
+The shell maintains a **bounded** navigation stack and one modal layer. Input events are edge-triggered; held keys use explicit repeat delays. Modal `BACK` cancels; a running remote job remains visible in history after navigating away. No screen owns the global HOME handler. If HOME cannot be bound on the existing launcher, document the limitation and implement a visible soft Home entry on each screen.
+
+**Screen-to-service traceability**:
+
+| User action | UI module | Service/driver | Visible result | Recovery |
+|---|---|---|---|---|
+| Select Wi-Fi scan | Security.WiFi | ESP32 WiFi scan | Access point list / count | timeout and retry |
+| Inspect access point | Security.WiFi.Detail | cached AP observation | SSID/BSSID/channel/RSSI/auth | Back to list |
+| Select BLE scan | Security.BLE | BLE scanner | discovered advertisements | stop scan, empty result |
+| Ask AI question | AI.Compose | companion AI proxy | answer pager | offline/timeout state |
+| Check Linux CPU | Linux.Health | GET host health | usage, timestamp, stale marker | choose another host |
+| Run deck macro | Deck.Run | POST job with idempotency key | confirmation, progress, output | look up status, do not double-run |
+| Toggle smart device | Home.Device | companion integration | acknowledged actual state | retry with fresh state |
+| Execute IR code | Home.IR | onboard IR emitter | transmit status, not claimed device success | repeat only on deliberate press |
+| Launch original apps | OriginalLauncher | verified launcher bridge | genuine original launcher | explanatory unavailable state |
+
+### 10.2 Concrete UI flows
+
+**A. Wi-Fi diagnostics:** Home > Security > Wi-Fi > Scan > Results > Detail > Save Finding > (optional) Explain with Oyster AI. Use observation timestamps, sanitized labels, network privacy notice, bounded cache. No cracking, deauthentication or intrusive radio behavior in MVP.
+
+**B. BLE inventory:** Home > Security > BLE > Scan > Results > Device > GATT (only if owned/authorized) > Save. Show both random/public address semantics when reported; addresses may rotate and signal strength fluctuates.
+
+**C. Linux control:** Home > Linux > Pick host > System Health > Services > Details. A task requires Home > Linux > Approved tasks > Confirm (for state-changing) > Running > Result. Never treat a process being queued as successful.
+
+**D. Smart macro:** Home > Control Deck > Profile > Slot 1 > Macro summary > Confirmation (when needed) > Job progress > Result. If Wi-Fi drops after POST: show 'status unknown', reconcile via same idempotency key before trying again.
+
+**E. Automation schedule:** Control Deck > Automations > Schedule list > Details > Enable/disable > Backend acknowledgment. Editing new schedules may be companion web UI for MVP; device can monitor and trigger preconfigured ones.
+
+**F. Voice:** Home > Oyster AI > Record > waveform/recording indicator > upload/transcribe > confirmation of recognized text > AI answer. Ship after text input works. Audio data retention policy must be visible.
+
+**G. Original apps:** Home > Original Apps > 'Switch to original launcher?' > verified firmware API > actual launcher. If original software cannot coexist in the same flash setup, the UI must not advertise seamless switching.
+
+## 11. Visual design system — implementation-ready
+
+### 11.1 Layout anatomy (240 × 135)
+
+- Main surface 240 × 135 landscape; top status region y=0..14; title y=16..31; content y=33..116; contextual footer y=119..134.
+- Horizontal safe inset 5px. Do not render tiny multi-column dashboards that reduce focusability.
+- Default text 12px-equivalent bitmap font; key titles 14px-equivalent; metadata 10px minimum only where legible. Verify with photographs on the physical device.
+- A selected row uses a seafoam left bar (3px), tinted navy background, white label; disabled row uses muted text and 'Unavailable' suffix.
+- Animations <= 150ms and never block scan, Wi-Fi, keyboard or watchdog servicing.
+- Icons should be simple monochrome bitmaps or vector-to-bitmap build artifacts. No network-fetched UI assets on device.
+
+### 11.2 UI component specifications
+
+| Component | Display | Interaction |
+|---|---|---|
+| StatusBar | title or brand, connection icon, battery if available | no focus |
+| MenuList | 3–5 entries, scrolling focus, disabled states | Up/Down, Select |
+| DetailPanel | property/value pairs | scroll and Back |
+| TextEntry | keyboard typed characters, visible caret, character counter | type, Backspace, Submit |
+| ConfirmationDialog | operation name, target, risk, Yes/No | default No |
+| ProgressPanel | state label, spinner/progress if known, elapsed | Cancel if permitted |
+| Notification | short acknowledgement/failure | dismiss after user action |
+| HelpOverlay | physical keys and controls per route | Back dismiss |
+| OfflineView | companion offline, last-seen time | Retry or Back |
+| OriginalLauncherBridge | verified integration only | explicit transition |
+
+### 11.3 Color and accessibility
+
+| Token | Hex | Use |
+|---|---|---|
+| `surface.base` | `#101923` | shell |
+| `surface.panel` | `#192C3D` | cards/list |
+| `surface.focus` | `#234B54` | selected row |
+| `text.primary` | `#F4FAFF` | high legibility |
+| `text.muted` | `#A9C4CE` | supporting text |
+| `accent` | `#5EEAD4` | selected/connected |
+| `warning` | `#E9AD52` | confirmation/wait |
+| `error` | `#F17A7A` | error and destructive intent |
+
+Focus should not rely solely on color: add selector glyph `>` and outline. Keyboard help is always one action away. A 'large text' option can reduce visible rows.
+
+### 11.4 Wireframes and screen identifiers
+
+```text
+HOME [H01]                      WIFI RESULTS [S12]
++-----------------------------+  +-----------------------------+
+| OYSTER OS       WiFi  BAT   |  | WI-FI SURVEY       12 APs   |
+|-----------------------------|  |-----------------------------|
+| >1 Security    4 Control   |  | >OfficeWiFi       -54 dBm   |
+|  2 Oyster AI   5 SmartHome |  |  Guest            -72 dBm   |
+|  3 Linux       6 Original  |  |  IoT              -81 dBm   |
+|-----------------------------|  |-----------------------------|
+| Back Help       Enter Open |  | Back      Enter Inspect     |
++-----------------------------+  +-----------------------------+
+
+DECK [D10]                     JOB [D20]
++-----------------------------+  +-----------------------------+
+| CONTROL DECK     HOME       |  | START DEV STACK             |
+|-----------------------------|  |-----------------------------|
+| >1 Server status            |  | Host: MINI-PC               |
+|  2 Start dev stack          |  | Impact: starts services     |
+|  3 Red Orca status          |  | Confirm execution?          |
+|  4 Backup                  |  | >No          Yes            |
+|-----------------------------|  |-----------------------------|
+| Back              Run      |  | Back          Enter         |
++-----------------------------+  +-----------------------------+
+
+LINUX [L10]                    AI [A10]
++-----------------------------+  +-----------------------------+
+| LINUX       MINI-PC  ONLINE |  | OYSTER AI          ONLINE   |
+|-----------------------------|  |-----------------------------|
+| > System health             |  | Ask a question              |
+|   Services                  |  | >                           |
+|   Logs                      |  |                             |
+|   Approved tasks            |  |                             |
+|-----------------------------|  |-----------------------------|
+| Back            Inspect    |  | Back         Enter Send     |
++-----------------------------+  +-----------------------------+
+```
+
+### 11.5 Consistency rules
+
+- All back footers have the same semantics; no special unannounced escape keys.
+- All network requests show *connecting*, timeout and retry.
+- Input focus persists when a list refreshes when possible.
+- Never place a destructive task directly on a single unconfirmed numbered shortcut.
+- App names use consistent nouns in README, route names and code.
+
+## 12. Architecture and boundaries
+
+```mermaid
+flowchart LR
+  Keyboard[Cardputer keyboard] --> Input[Input mapper]
+  Input --> Router[Screen router + nav state]
+  Router --> View[UI renderer 240x135]
+  Router --> Modules[Feature controllers]
+  Modules --> Driver[Wi-Fi BLE IR hardware adapters]
+  Modules --> Client[Authenticated API client]
+  Client --> Api[Companion FastAPI]
+  Api --> Auth[Pairing + authorization]
+  Auth --> Jobs[Allowlisted job executor]
+  Auth --> Ai[AI provider proxy]
+  Auth --> Home[Home Assistant adapter]
+  Jobs --> Logs[Job state + audit SQLite]
+  Jobs --> Host[Local/SSH host adapters]
+  Adapter[Verified original launcher bridge] --> Launcher[Existing firmware launcher]
+  Router --> Adapter
+```
+
+**Boundary rules:** The ESP32 never holds long-lived third-party API keys. Companion endpoints validate requests independently of device UI. The server decides which macros exist and may run. Health probes and jobs use typed payloads with schema validation and version negotiation. Store pairing keys via best available secure storage and provide revocation.
+
+## 13. Project structure and deliverables
+
+Build this as a **monorepo** with separately testable packages:
+
+```text
+/
+  README.md
+  docs/
+    OysterOS_Project_Plan.md
+    DESIGN_SYSTEM.md
+    DEVELOPMENT_ROADMAP.md
+    HARDWARE_AUDIT_TEMPLATE.md
+  simulator/
+    README.md
+    src/              # pixel-sized UI and keyboard emulation
+    tests/
+  firmware/
+    README.md         # choose SDK after audit
+    src/
+      core/           # routing + events
+      features/       # modules/controllers
+      drivers/        # screen, keyboard, radios
+      transport/
+    tests/
+  companion/
+    README.md
+    app/
+      api/
+      auth/
+      schemas/
+      adapters/
+      automation/
+      jobs/
+      storage/
+    tests/
+  .github/workflows/
+```
+
+**Coding-agent task ordering:**
+1. Implement simulator (no hardware write), with screenshots corresponding to design IDs.
+2. Add executable screen/navigation tests.
+3. Implement companion mock endpoints and job state simulator.
+4. Complete hardware audit & preservation proof, then select the device SDK.
+5. Connect first real hardware feature (Wi-Fi scan).
+6. Integrate companion with a read-only Linux health command.
+7. Add explicit allowlisted tasks and scheduled automation.
+8. Add BLE, Smart Home, and AI progressively.
+
+## 14. Measurable acceptance tests
+
+| Test ID | Given | Action | Pass condition |
+|---|---|---|---|
+| NAV-01 | any leaf screen | Back | returns to parent |
+| NAV-02 | any screen | Home | returns to root |
+| NAV-03 | confirm modal shown | Back | dismisses without execution |
+| SEC-01 | Wi-Fi radio on | scan | results shown, no crash |
+| SEC-02 | no APs | scan | shows empty state |
+| NET-01 | companion offline | select Linux | explanatory offline view |
+| JOB-01 | authorized macro | run | job_id and final status displayed |
+| JOB-02 | unauthorized macro | run | denied, audit entry |
+| JOB-03 | connection lost after POST | reload status | no automatic duplicate execution |
+| HOME-01 | smart device unavailable | toggle | no false success indicator |
+| AI-01 | empty question | submit | validation, no request |
+| ORIG-01 | original launcher bridge unavailable | choose Original Apps | explicit unavailable state |
+| ORIG-02 | integration verified | switch | real existing app menu appears |
+| PRES-01 | device pre/post-install | compare app inventory | original programs and configuration preserved |
+
+## 15. Constraints and decision gates
+
+**Hardware:** The exact feature set, partitioning, battery APIs, key codes and camera/GPS/audio capabilities must be verified against the specific Cardputer ADV and current firmware. A launcher may expose apps differently. Do not claim feature compatibility solely because an app icon exists.
+
+**Release gates:** No flashed build until hardware audit. No remote command execution until authentication, allowlist and audit logs have passing tests. No AI-triggered action without user confirmation, and no passive telemetry upload without opt-in.
+
+**Definition of MVP:** A usable OysterOS shell plus a working Wi-Fi scanner, read-only Linux host status and a configurable Smart Control Deck that triggers one approved companion action safely; original apps preserved via a verified compatible launcher.
