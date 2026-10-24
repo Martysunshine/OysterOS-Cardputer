@@ -182,7 +182,7 @@ Firmware candidates: **PlatformIO + C++** with device-specific M5Stack libraries
 Passive network discovery by default; deeper inspection only on owned or explicitly authorized assets. Linux and automation actions use **backend allowlists**, least-privilege accounts, authentication, timeouts, confirmation of impactful actions and audit trails. AI suggestions cannot execute arbitrary commands. Never commit credentials.
 
 ## Documentation
-See [Engineering Plan](docs/OysterOS_Project_Plan.md) for state transitions, backend endpoints, wiring, acceptance tests and implementation phases.
+Start with the [Engineering Plan](docs/OysterOS_Project_Plan.md) for full implementation wiring, then consult the [UI/UX Design System](docs/DESIGN_SYSTEM.md), [Development Roadmap](docs/DEVELOPMENT_ROADMAP.md), and [Firmware Preservation Audit](docs/HARDWARE_AUDIT_TEMPLATE.md). The first implementation tasks are in [GitHub Issues](../../issues).
 
 ## Getting started
 1. Photograph or record the current boot and home screens, firmware version and installed apps.
