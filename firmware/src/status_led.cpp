@@ -12,8 +12,8 @@ namespace oyster::statusled {
 namespace {
 
 constexpr uint32_t kTickMs = 40;   // 25 updates per second at most
-constexpr uint8_t kMax = 40;       // brightness ceiling (of 255): visible in a room, not a torch
-constexpr uint8_t kFloor = 4;      // breathing never goes fully dark
+constexpr uint8_t kMax = 100;      // brightness ceiling (of 255), chosen on the real device
+constexpr uint8_t kFloor = 8;      // breathing never goes fully dark
 
 Pattern s_pattern = Pattern::Off;
 uint32_t s_last_ms = 0;

@@ -1,5 +1,5 @@
 // Status LED: the single WS2812 on the StampS3 module shows the connection state at a glance, dim and slow
-// (never above 40/255, nothing faster than a 1 s blink). No task or timer: the UI task calls tick() and the
+// (never above 100/255, nothing faster than a 1 s blink). No task or timer: the UI task calls tick() and the
 // LED is written only when its colour changes. Implementation: src/status_led.cpp.
 #pragma once
 
