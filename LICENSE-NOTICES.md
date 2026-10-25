@@ -20,6 +20,7 @@ Third-party components used (each under its own license; see the respective proj
 | IRremote | MIT | firmware |
 | Bless, Bleak | MIT | lab fixture |
 | esptool (Espressif, bundled with PlatformIO as tool-esptoolpy) | GPL-2.0-or-later | run by `scripts/firmware-backup.ps1`; not distributed here |
+| psutil (Giampaolo Rodola) | BSD-3-Clause | backend (local host health adapter, Windows executor) |
 | Pillow | HPND | `simulator/` and `scripts/gen_assets.py` (development tools only; not part of the firmware) |
 | M5GFX `AsciiFont8x16` table and shape algorithms (M5Stack) | MIT, Copyright (c) 2021 M5Stack | `simulator/` (glyph tables extracted so that PC renders match the device) |
 | Adafruit GFX 5x7 font (`Font0`, Adafruit Industries) | BSD, Copyright (c) 2012 Adafruit Industries | `simulator/` (same reason) |

@@ -121,6 +121,7 @@ RunSummary s_runs[2];
 std::atomic<uint8_t> s_run_idx{0};
 char s_req[kReqCap];
 char s_resp[kRespCap + 1];
+char s_idem_key[72] = {};  // Idempotency-Key header of the current call() (empty: none); set under Lock
 size_t s_resp_len = 0;
 
 class Lock {
@@ -349,6 +350,9 @@ int http_once(const char* method, const char* path, const char* body, size_t bod
                    method, path, s_cfg.backend_host, static_cast<unsigned>(s_cfg.backend_port), OYSTER_FIRMWARE_VERSION);
   if (n > 0 && auth && static_cast<size_t>(n) < sizeof(head)) {
     n += snprintf(head + n, sizeof(head) - n, "Authorization: Bearer %s\r\n", s_token);
+  }
+  if (n > 0 && s_idem_key[0] != '\0' && static_cast<size_t>(n) < sizeof(head)) {
+    n += snprintf(head + n, sizeof(head) - n, "Idempotency-Key: %s\r\n", s_idem_key);
   }
   if (n > 0 && static_cast<size_t>(n) < sizeof(head)) {
     if (body != nullptr) {
@@ -1009,13 +1013,15 @@ bool BackendClient::poll_run(const char* run_id, RunSummary& out) {
 }
 
 int BackendClient::call(const char* method, const char* path, const char* body, size_t body_len, char* resp,
-                        size_t cap, size_t* resp_len, bool idempotent) {
+                        size_t cap, size_t* resp_len, bool idempotent, const char* idempotency_key) {
   Lock l;
   if (resp_len != nullptr) *resp_len = 0;
   if (resp != nullptr && cap > 0) resp[0] = '\0';
   if (method == nullptr || path == nullptr || std::strncmp(path, "/v1/", 4) != 0) return kErrIo;
   if (body_len > kReqCap) return kErrTooLarge;
+  snprintf(s_idem_key, sizeof(s_idem_key), "%s", idempotency_key != nullptr ? idempotency_key : "");
   const int st = http(method, path, body, body_len, true, idempotent ? Retry::Once : Retry::Never);
+  s_idem_key[0] = 0;
   if (resp != nullptr && cap > 0 && s_resp_len > 0) {
     const size_t n = s_resp_len < cap - 1 ? s_resp_len : cap - 1;
     std::memcpy(resp, s_resp, n);

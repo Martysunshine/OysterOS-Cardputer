@@ -68,8 +68,8 @@ void toast(const char* text) { app_post(AppEventType::Toast, 0, 0, text); }
 bool backend_ready() { return g_backend.state() == BackendState::Connected; }
 
 int http(const char* method, const char* path, const char* body, size_t body_len, char* resp, size_t cap,
-         size_t* resp_len, bool idempotent) {
-  return g_backend.call(method, path, body, body_len, resp, cap, resp_len, idempotent);
+         size_t* resp_len, bool idempotent, const char* idempotency_key) {
+  return g_backend.call(method, path, body, body_len, resp, cap, resp_len, idempotent, idempotency_key);
 }
 
 const char* last_error() { return backend_detail::last_error(); }

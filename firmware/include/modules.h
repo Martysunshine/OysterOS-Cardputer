@@ -91,7 +91,7 @@ bool backend_ready();
 // truncated at cap-1). Only paths under /v1/ are accepted. `idempotent` allows one automatic retry on a dead
 // keep-alive connection: pass false for anything that must not run twice.
 int http(const char* method, const char* path, const char* body, size_t body_len, char* resp, size_t cap,
-         size_t* resp_len, bool idempotent);
+         size_t* resp_len, bool idempotent, const char* idempotency_key = nullptr);
 // The last short error text of the backend client (for messages).
 const char* last_error();
 

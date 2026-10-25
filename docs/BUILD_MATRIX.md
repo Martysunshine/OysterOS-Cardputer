@@ -101,7 +101,7 @@ shrink it only after reading the real stack high-water mark from telemetry on ha
 | Python | 3.13.5 (CPython, Windows x64); `requires-python >= 3.12` |
 | PlatformIO Core | 6.2.0 |
 | All Python packages | pinned in [`constraints.txt`](../constraints.txt) (installed with `pip install -c constraints.txt ...` by `scripts\setup.ps1`) |
-| Key packages | fastapi 0.162.0, starlette 1.10.0, pydantic 2.14.1, httpx 0.28.1, uvicorn 0.54.0, jsonschema 4.26.0, cryptography 50.0.2, python-dotenv 1.2.4, pyserial 3.5, pytest 9.1.1, pytest-asyncio 1.4.0, ruff 0.17.2, bleak 3.0.2, winrt-* 4!10.0.28000.2705 (winrt-runtime 4.0.1), certifi 2026.10.23, pillow 13.0.0 (screen simulator and asset converter only) |
+| Key packages | fastapi 0.162.0, starlette 1.10.0, pydantic 2.14.1, httpx 0.28.1, uvicorn 0.54.0, jsonschema 4.26.0, cryptography 50.0.2, python-dotenv 1.2.4, pyserial 3.5, pytest 9.1.1, pytest-asyncio 1.4.0, ruff 0.17.2, bleak 3.0.2, winrt-* 4!10.0.28000.2705 (winrt-runtime 4.0.1), certifi 2026.10.23, pillow 13.0.0 (screen simulator and asset converter only), psutil 7.2.2 (local host adapter and Windows executor) |
 | truststore | 0.10.5 (backend declares `truststore>=0.10`); pinned in `constraints.txt` (`truststore==0.10.5`) and by `scripts\setup.ps1` |
 
 ## How to reproduce
