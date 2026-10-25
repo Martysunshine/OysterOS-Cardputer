@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "job_id": "job-000004",
+  "session_id": "sess-example-01",
+  "device_id": "sim-cardputer-01",
+  "target_id": "target-lab-01",
+  "operation": "ble_read_profile_value",
+  "arguments": {"characteristic_id": "public_sensor"},
+  "scope_version": 1,
+  "deadline_s": 30,
+  "limits": {"max_bytes": 512, "max_duration_s": 20},
+  "requires_local_confirmation": false,
+  "nonce": null
+}

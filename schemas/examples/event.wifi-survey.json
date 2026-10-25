@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "event_id": "evt-000003",
+  "session_id": "sess-example-01",
+  "device_id": "sim-cardputer-01",
+  "boot_id": "boot-example-01",
+  "sequence": 3,
+  "source_mode": "simulated",
+  "transport": "wifi",
+  "target_id": null,
+  "operation": "wifi_survey",
+  "timestamp_utc": "2026-10-24T09:15:02Z",
+  "clock_quality": "ntp",
+  "uptime_ms": 9100,
+  "status": "success",
+  "details": {
+    "room_label": "lab-bench",
+    "scan": {"mode": "passive", "show_hidden": true, "max_ms_per_channel": 300, "observed_ap_country": null},
+    "complete": true,
+    "overflow_count": 0,
+    "observations": [
+      {"ssid_hex": "4f797374657232", "ssid_display": "Oyster2", "bssid": "02:00:00:00:00:01", "channel": 6, "rssi_dbm": -48, "auth_mode": "WPA2_PSK", "wps": "unknown", "pmf": "unknown"},
+      {"ssid_hex": "", "ssid_display": null, "bssid": "02:00:00:00:00:02", "channel": 11, "rssi_dbm": -77, "auth_mode": "WPA2_WPA3_PSK", "wps": "unknown", "pmf": "unknown"}
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oyster-pocket/schemas/report.schema.json",
+  "title": "Session report (JSON form)",
+  "description": "Versioned report. Every cited evidence ID must exist in this session or an explicitly linked baseline.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_version","session_id","generated_at","source_modes","linked_baseline_session_id","findings","evidence_index","runs","limitations"],
+  "properties": {
+    "report_version": {"const": "1.0"},
+    "session_id": {"type": "string"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "source_modes": {"type": "array", "items": {"enum": ["live","offline","simulated"]}, "minItems": 1},
+    "linked_baseline_session_id": {"type": ["string","null"]},
+    "findings": {"type": "array", "items": {"$ref": "finding.schema.json"}},
+    "evidence_index": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id","operation","status","source_mode","session_id"],
+        "properties": {
+          "event_id": {"type": "string"}, "operation": {"type": "string"}, "status": {"type": "string"},
+          "source_mode": {"type": "string"}, "session_id": {"type": "string"}, "target_id": {"type": ["string","null"]}
+        }
+      }
+    },
+    "runs": {"type": "array", "items": {"type": "object"}},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "kind": "final_answer",
+  "provider_call_id": "call_example_2",
+  "final": {
+    "answer_markdown": "The public sensor returned a 2-byte value on an unencrypted link (evt-000018). This is expected for a public value and is not a vulnerability.",
+    "cited_evidence_ids": ["evt-000018"],
+    "limitations": ["Result comes from the simulator, not a live radio."],
+    "suggestions": ["Run the restricted diagnostics check to compare access before and after authorisation."]
+  }
+}

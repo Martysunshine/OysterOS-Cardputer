@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oyster-pocket/schemas/job.schema.json",
+  "title": "Device job",
+  "description": "A bounded unit of work for the Cardputer (or simulator). Validated independently by backend and device.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","job_id","session_id","operation","arguments","scope_version","deadline_s","limits","requires_local_confirmation"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "job_id": {"type": "string", "pattern": "^job-[0-9a-zA-Z_-]{1,40}$"},
+    "session_id": {"type": "string", "pattern": "^sess-[0-9a-zA-Z_-]{1,40}$"},
+    "device_id": {"type": ["string","null"]},
+    "target_id": {"type": ["string","null"]},
+    "operation": {"enum": ["wifi_survey","ble_discover","ble_inspect_gatt","ble_read_profile_value","ble_observe_notifications","ble_check_access_policy","ble_write_lab_value","ble_collect_diagnostics"]},
+    "arguments": {"type": "object"},
+    "scope_version": {"type": "integer", "minimum": 1, "description": "Profile/scope version; device rejects stale versions."},
+    "deadline_s": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_results": {"type": "integer", "minimum": 1, "maximum": 256},
+        "max_duration_s": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+        "max_bytes": {"type": "integer", "minimum": 1, "maximum": 65536}
+      }
+    },
+    "requires_local_confirmation": {"type": "boolean", "description": "Derived server-side from operation type. The device re-derives it and never trusts this flag to LOWER the requirement."},
+    "nonce": {"type": ["string","null"], "description": "Binds a local confirmation to this exact job."}
+  }
+}

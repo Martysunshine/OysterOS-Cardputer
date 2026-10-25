@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oyster-pocket/schemas/target-profile.schema.json",
+  "title": "Enrolled target",
+  "description": "A peripheral the owner enrolled for assessment, bound to a profile and a scope version. Only enrolled targets may be connected to.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","target_id","display_name","profile_id","scope_version","allowed_operations","identity"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "target_id": {"type": "string", "pattern": "^target-[0-9a-zA-Z_-]{1,40}$"},
+    "display_name": {"type": "string", "maxLength": 64},
+    "profile_id": {"type": "string", "maxLength": 64},
+    "scope_version": {"type": "integer", "minimum": 1},
+    "allowed_operations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["ble_inspect_gatt","ble_read_profile_value","ble_observe_notifications","ble_check_access_policy","ble_write_lab_value","ble_collect_diagnostics"]}
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How the device recognises this target. Name alone never establishes identity; random addresses can rotate.",
+      "properties": {
+        "advertised_name": {"type": ["string","null"], "maxLength": 32},
+        "service_uuid": {"type": ["string","null"]},
+        "address": {"type": ["string","null"], "pattern": "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"},
+        "address_type": {"enum": ["public","random","unknown", null]}
+      }
+    },
+    "notes": {"type": ["string","null"], "maxLength": 400, "description": "Untrusted owner notes. Treated as data, never as instructions."}
+  }
+}

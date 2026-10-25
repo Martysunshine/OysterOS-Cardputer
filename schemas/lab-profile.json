@@ -1,0 +1,243 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "oyster-lab-v1",
+  "profile_version": 1,
+  "description": "Synthetic lab peripheral for Oyster Pocket. Exposes only synthetic data. The fixture mode (vulnerable/corrected) is NEVER exposed over GATT, so false-positive evaluation stays blind.",
+  "service_uuid": "862f20d9-fa73-5f89-b130-86ee93e78261",
+  "characteristics": {
+    "public_sensor": {
+      "uuid": "9f049067-d6ce-5453-9ff9-4dbb2b3342d4",
+      "properties": [
+        "read",
+        "notify"
+      ],
+      "policy": {
+        "read": "public",
+        "notify": "public"
+      },
+      "value_format": "int16 little-endian, synthetic temperature in centi-degrees C",
+      "max_length": 2,
+      "description": "Public synthetic sensor value. Reading it is never a finding."
+    },
+    "restricted_enc": {
+      "uuid": "1b140da2-75c7-505d-8836-2f2408b9c79d",
+      "properties": [
+        "read"
+      ],
+      "policy": {
+        "read": "link_encryption"
+      },
+      "value_format": "ASCII text LAB-ENC-OK",
+      "max_length": 16,
+      "description": "Readable only over an encrypted link (WinRT GattProtectionLevel.ENCRYPTION_REQUIRED). The central stack may auto-escalate security; record the security state before and after."
+    },
+    "restricted_mitm": {
+      "uuid": "cb2e3a41-f11e-5589-975b-e19fa35a4e82",
+      "properties": [
+        "read"
+      ],
+      "policy": {
+        "read": "link_authentication"
+      },
+      "value_format": "ASCII text LAB-MITM-OK",
+      "max_length": 16,
+      "description": "Readable only over an encrypted AND authenticated (MITM-protected) link (WinRT ENCRYPTION_AND_AUTHENTICATION_REQUIRED). A Just Works (unauthenticated) pairing must not satisfy it."
+    },
+    "app_auth": {
+      "uuid": "979903f6-da0e-5dc1-9051-74b1c112d851",
+      "properties": [
+        "read",
+        "write"
+      ],
+      "policy": {
+        "read": "public",
+        "write": "public"
+      },
+      "value_format": "read: [state u8: 0=unauthorized,1=authorized][challenge 16 bytes]; write: HMAC-SHA256(enrolled_token, challenge) 32 bytes",
+      "max_length": 32,
+      "description": "Application-authorisation exchange with an out-of-band enrolled test credential. The token itself never travels over the air."
+    },
+    "diag_manifest": {
+      "uuid": "f40f4bd8-e156-5f1b-9b7a-3da5a50170f9",
+      "properties": [
+        "read"
+      ],
+      "policy": {
+        "read": "app_authorization"
+      },
+      "value_format": "binary manifest v1 (see transfer.manifest_layout); on application-level denial: single byte 0x01",
+      "max_length": 64,
+      "description": "Manifest of the fixed synthetic diagnostic object."
+    },
+    "chunk_ctrl": {
+      "uuid": "e24475fc-f9f2-5a32-96b6-28d8434220ba",
+      "properties": [
+        "write"
+      ],
+      "policy": {
+        "write": "app_authorization"
+      },
+      "value_format": "13 bytes: [op u8][object_tag 4][offset u32 LE][length u16 LE][seq u16 LE]",
+      "max_length": 13,
+      "description": "Chunk request / cancel / reset. Fits in a default 20-byte ATT write."
+    },
+    "chunk_data": {
+      "uuid": "38853531-990c-50b7-b0c1-c47516ff0d5a",
+      "properties": [
+        "read"
+      ],
+      "policy": {
+        "read": "app_authorization"
+      },
+      "value_format": "[status u8][seq u16 LE][offset u32 LE][len u16 LE][payload len bytes]",
+      "max_length": 246,
+      "description": "Response to the last chunk_ctrl request."
+    },
+    "diag_status": {
+      "uuid": "a46f2246-89bf-57ce-beae-7d9f819f063a",
+      "properties": [
+        "read"
+      ],
+      "policy": {
+        "read": "public"
+      },
+      "value_format": "[last_status u8][last_seq u16 LE]",
+      "max_length": 3,
+      "description": "Status of the last transfer request (application-level codes)."
+    },
+    "virtual_led": {
+      "uuid": "b4bbe699-5a09-522a-90bd-0ca88cc5a1a3",
+      "properties": [
+        "read",
+        "write"
+      ],
+      "policy": {
+        "read": "public",
+        "write": "app_authorization"
+      },
+      "value_format": "u8 colour: 0=off, 1=red, 2=green, 3=blue, 4=white",
+      "max_length": 1,
+      "description": "Reversible harmless write target."
+    },
+    "device_info": {
+      "uuid": "605552ac-9e34-5c62-9e9a-74b6a27c44dc",
+      "properties": [
+        "read"
+      ],
+      "policy": {
+        "read": "public"
+      },
+      "value_format": "ASCII oyster-lab-v1;1 (profile_id;profile_version). Does not reveal the fixture mode.",
+      "max_length": 32,
+      "description": "Profile identity for the application-level identity check."
+    }
+  },
+  "assertions": [
+    {
+      "test_id": "public_sensor_is_public",
+      "characteristic": "public_sensor",
+      "operation": "read",
+      "precondition": "connected_unencrypted",
+      "expected": "allowed",
+      "severity_if_violated": "informational",
+      "informational": true,
+      "description": "Public value is readable; this is an observation, never a vulnerability."
+    },
+    {
+      "test_id": "restricted_value_requires_link_encryption",
+      "characteristic": "restricted_enc",
+      "operation": "read",
+      "precondition": "connected_unencrypted",
+      "expected": "denied",
+      "severity_if_violated": "medium",
+      "informational": false,
+      "description": "Value must not be returned while the link is unencrypted. If the stack escalated security first, a value returned under encryption satisfies the policy; the transition is recorded."
+    },
+    {
+      "test_id": "restricted_value_requires_authenticated_pairing",
+      "characteristic": "restricted_mitm",
+      "operation": "read",
+      "precondition": "encrypted",
+      "expected": "denied",
+      "severity_if_violated": "medium",
+      "informational": false,
+      "description": "Value must not be returned over a link that is encrypted but not authenticated (Just Works). Inconclusive when the authentication state of the link cannot be read."
+    },
+    {
+      "test_id": "restricted_diagnostics_requires_app_authorization",
+      "characteristic": "diag_manifest",
+      "operation": "transfer",
+      "precondition": "app_unauthorized",
+      "expected": "denied",
+      "severity_if_violated": "medium",
+      "informational": false,
+      "description": "Diagnostic manifest and chunks must be denied before application authorisation."
+    },
+    {
+      "test_id": "diagnostics_available_after_app_authorization",
+      "characteristic": "diag_manifest",
+      "operation": "transfer",
+      "precondition": "app_authorized",
+      "expected": "allowed",
+      "severity_if_violated": "low",
+      "informational": false,
+      "description": "After a legitimate exchange, the object transfers and its SHA-256 matches the manifest."
+    },
+    {
+      "test_id": "virtual_led_write_requires_app_authorization",
+      "characteristic": "virtual_led",
+      "operation": "write",
+      "precondition": "app_unauthorized",
+      "expected": "denied",
+      "severity_if_violated": "low",
+      "informational": false,
+      "description": "Write before authorisation is rejected in every fixture mode."
+    }
+  ],
+  "write_values": {
+    "virtual_led": {
+      "type": "enum_u8",
+      "allowed": {
+        "off": 0,
+        "red": 1,
+        "green": 2,
+        "blue": 3,
+        "white": 4
+      },
+      "reversible": true,
+      "denial_att_status": 8,
+      "denial_note": "ATT 0x08 Insufficient Authorization = application-level authorization denial"
+    }
+  },
+  "transfer": {
+    "object_id": "diag-synth-0001",
+    "max_object_bytes": 65536,
+    "manifest_layout": "[version u8 = 1][object_id 16 bytes ASCII zero-padded][declared_length u32 LE][sha256 32 bytes][chunk_max u16 LE] = 55 bytes",
+    "object_tag": "first 4 bytes of the manifest sha256; binds every chunk request to one object version",
+    "ctrl_ops": {
+      "request": 1,
+      "cancel": 2,
+      "reset": 3
+    },
+    "status_codes": {
+      "ok": 0,
+      "not_authorized": 1,
+      "bad_request": 2,
+      "stale_object": 3,
+      "out_of_range": 4,
+      "cancelled": 5,
+      "no_request": 6
+    },
+    "chunk_header_bytes": 9,
+    "chunk_len_rule": "chunk_len <= min(manifest.chunk_max, ATT_MTU - 1 - 9)",
+    "resume_rule": "Re-read the manifest; resume only if declared_length and sha256 are unchanged; otherwise discard the .partial file and restart."
+  },
+  "app_auth": {
+    "algorithm": "HMAC-SHA256",
+    "challenge_bytes": 16,
+    "response_bytes": 32,
+    "authorization_ttl_s": 120,
+    "notes": "Authorisation state is fixture-global with a TTL and is cleared on reset-state (ADR-007).",
+    "challenge_ttl_s": 60
+  }
+}

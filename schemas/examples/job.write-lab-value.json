@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "job_id": "job-000009",
+  "session_id": "sess-example-01",
+  "device_id": "sim-cardputer-01",
+  "target_id": "target-lab-01",
+  "operation": "ble_write_lab_value",
+  "arguments": {"characteristic_id": "virtual_led", "value": "green", "restore": true},
+  "scope_version": 1,
+  "deadline_s": 150,
+  "limits": {"max_bytes": 1, "max_duration_s": 30},
+  "requires_local_confirmation": true,
+  "nonce": "n-6f1c2a9e44b0"
+}

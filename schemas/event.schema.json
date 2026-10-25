@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oyster-pocket/schemas/event.schema.json",
+  "title": "Observation event envelope",
+  "description": "Append-only evidence event. Absent measurements are null/unknown, never invented defaults.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","event_id","session_id","device_id","boot_id","sequence","source_mode","transport","operation","clock_quality","uptime_ms","status","details"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "event_id": {"type": "string", "pattern": "^evt-[0-9a-zA-Z_-]{1,40}$"},
+    "session_id": {"type": "string", "pattern": "^sess-[0-9a-zA-Z_-]{1,40}$"},
+    "device_id": {"type": "string", "pattern": "^[0-9a-zA-Z_-]{1,40}$"},
+    "boot_id": {"type": "string", "pattern": "^boot-[0-9a-zA-Z_-]{1,40}$"},
+    "sequence": {"type": "integer", "minimum": 0},
+    "source_mode": {"enum": ["live","offline","simulated"]},
+    "transport": {"enum": ["wifi","ble","backend","local","none"]},
+    "target_id": {"type": ["string","null"]},
+    "operation": {"type": "string", "minLength": 1, "maxLength": 64},
+    "timestamp_utc": {"type": ["string","null"], "format": "date-time"},
+    "clock_quality": {"enum": ["ntp","serial","backend_hint","unknown"]},
+    "uptime_ms": {"type": "integer", "minimum": 0},
+    "status": {"enum": ["success","denied","timeout","unsupported","error","cancelled","partial","unknown_outcome","inconclusive"]},
+    "details": {
+      "type": "object",
+      "description": "Operation-specific payload. Security fields are nullable when the stack cannot report reliable state.",
+      "properties": {
+        "security_state": {
+          "type": ["object","null"],
+          "additionalProperties": false,
+          "properties": {
+            "encrypted": {"type": ["boolean","null"]},
+            "authenticated_pairing": {"type": ["boolean","null"]},
+            "application_authorized": {"type": ["boolean","null"]}
+          }
+        },
+        "raw_att_status": {"type": ["integer","null"], "description": "ATT error code when exposed by the stack; null when the library does not surface it."},
+        "value_length": {"type": ["integer","null"], "minimum": 0}
+      }
+    }
+  }
+}

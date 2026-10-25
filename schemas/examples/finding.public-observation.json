@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "finding_id": "finding-example-02",
+  "session_id": "sess-example-01",
+  "target_id": "target-lab-01",
+  "profile_id": "oyster-lab-v1",
+  "test_id": "public_sensor_is_public",
+  "classification": "observation",
+  "title": "Public sensor value is readable",
+  "expected_policy": "Public value; readable by any connected client",
+  "observed_behavior": "A 2-byte synthetic value was returned on an unencrypted link",
+  "evidence_ids": ["evt-000018"],
+  "severity": "informational",
+  "confidence": "high",
+  "source_mode": "simulated",
+  "limitations": ["A public read is informational and is never a vulnerability"],
+  "retest_of": null
+}

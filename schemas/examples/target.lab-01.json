@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "target_id": "target-lab-01",
+  "display_name": "Oyster lab fixture",
+  "profile_id": "oyster-lab-v1",
+  "scope_version": 1,
+  "allowed_operations": ["ble_inspect_gatt", "ble_read_profile_value", "ble_observe_notifications", "ble_check_access_policy", "ble_write_lab_value", "ble_collect_diagnostics"],
+  "identity": {"advertised_name": "OysterLab", "service_uuid": "862f20d9-fa73-5f89-b130-86ee93e78261", "address": null, "address_type": "unknown"},
+  "notes": null
+}

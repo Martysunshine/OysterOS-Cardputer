@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "finding_id": "finding-example-01",
+  "session_id": "sess-example-01",
+  "target_id": "target-lab-01",
+  "profile_id": "oyster-lab-v1",
+  "test_id": "restricted_diagnostics_requires_app_authorization",
+  "classification": "confirmed",
+  "title": "Lab diagnostics returned before application authorization",
+  "expected_policy": "Deny diagnostic content before application authorization",
+  "observed_behavior": "The known synthetic diagnostic object was returned",
+  "evidence_ids": ["evt-000021", "artifact-example-01"],
+  "severity": "medium",
+  "confidence": "high",
+  "source_mode": "simulated",
+  "limitations": ["Impact demonstrated with synthetic lab data only"],
+  "retest_of": null
+}

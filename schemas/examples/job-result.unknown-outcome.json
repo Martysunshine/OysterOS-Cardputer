@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "job_id": "job-000009",
+  "idempotency_key": "res-job-000009-boot-example-02",
+  "outcome": "unknown_outcome",
+  "event_ids": ["evt-000031"],
+  "artifact_ids": [],
+  "error": "transport lost after write request was sent; state not reconciled",
+  "confirmation": {"job_id": "job-000009", "nonce": "n-6f1c2a9e44b0", "approved": true}
+}

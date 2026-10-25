@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oyster-pocket/schemas/ai-action.schema.json",
+  "title": "Normalized AI action",
+  "description": "What the orchestrator extracts from one provider response (a tool call). Validated strictly; one schema-correction attempt, then visible failure. Repairs never invent authorisation or results.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind"],
+  "properties": {
+    "kind": {"enum": ["tool_call", "final_answer"]},
+    "tool": {"enum": ["wifi_survey","ble_discover","ble_inspect_gatt","ble_read_profile_value","ble_observe_notifications","ble_check_access_policy","ble_write_lab_value","ble_collect_diagnostics","compare_sessions","explain_evidence","generate_report"]},
+    "arguments": {"type": "object"},
+    "provider_call_id": {"type": ["string", "null"], "maxLength": 120},
+    "final": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["answer_markdown", "cited_evidence_ids", "limitations", "suggestions"],
+      "properties": {
+        "answer_markdown": {"type": "string", "maxLength": 6000},
+        "cited_evidence_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 64},
+        "limitations": {"type": "array", "items": {"type": "string", "maxLength": 300}, "maxItems": 16},
+        "suggestions": {"type": "array", "items": {"type": "string", "maxLength": 300}, "maxItems": 16}
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"kind": {"const": "tool_call"}}}, "then": {"required": ["tool", "arguments"]}},
+    {"if": {"properties": {"kind": {"const": "final_answer"}}}, "then": {"required": ["final"]}}
+  ]
+}

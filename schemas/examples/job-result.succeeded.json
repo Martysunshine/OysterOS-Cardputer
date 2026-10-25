@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "job_id": "job-000004",
+  "idempotency_key": "res-job-000004-boot-example-01",
+  "outcome": "succeeded",
+  "event_ids": ["evt-000018"],
+  "artifact_ids": [],
+  "error": null,
+  "confirmation": null
+}

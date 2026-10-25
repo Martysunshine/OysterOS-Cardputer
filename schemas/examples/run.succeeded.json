@@ -1,0 +1,23 @@
+{
+  "run_id": "run-000002",
+  "session_id": "sess-example-01",
+  "status": "succeeded",
+  "question": "Inspect my enrolled BLE sensor.",
+  "provider": {"name": "fake", "model": null, "is_fake": true},
+  "budget": {"actions_used": 1, "actions_max": 12, "provider_requests_used": 2, "provider_requests_max": 6, "elapsed_s": 3.4, "max_duration_s": 180},
+  "steps": [
+    {"index": 0, "kind": "provider_request", "tool": null, "job_id": null, "outcome": "tool_call", "event_ids": [], "summary": "Model requested ble_read_profile_value(public_sensor)"},
+    {"index": 1, "kind": "job", "tool": "ble_read_profile_value", "job_id": "job-000004", "outcome": "succeeded", "event_ids": ["evt-000018"], "summary": "Simulated device returned 2 bytes"},
+    {"index": 2, "kind": "final_answer", "tool": null, "job_id": null, "outcome": "valid", "event_ids": ["evt-000018"], "summary": "Answer cites 1 evidence id"}
+  ],
+  "answer": {
+    "answer_markdown": "The public sensor returned a 2-byte value (evt-000018).",
+    "cited_evidence_ids": ["evt-000018"],
+    "limitations": ["Simulated result"],
+    "suggestions": [],
+    "source_modes": ["simulated"]
+  },
+  "pending_action": null,
+  "usage": {"input_tokens": 0, "output_tokens": 0, "cost": "unavailable"},
+  "error": null
+}

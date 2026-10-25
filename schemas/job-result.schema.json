@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oyster-pocket/schemas/job-result.schema.json",
+  "title": "Job result",
+  "description": "Result submitted by the device. Submission is idempotent; execution is never auto-repeated.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","job_id","idempotency_key","outcome","event_ids"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "job_id": {"type": "string", "pattern": "^job-[0-9a-zA-Z_-]{1,40}$"},
+    "idempotency_key": {"type": "string", "minLength": 8, "maxLength": 80},
+    "outcome": {"enum": ["succeeded","failed","cancelled","expired","unknown_outcome","unsupported"]},
+    "event_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 256},
+    "artifact_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 32},
+    "error": {"type": ["string","null"], "maxLength": 240},
+    "confirmation": {
+      "type": ["object","null"],
+      "additionalProperties": false,
+      "required": ["job_id","nonce","approved"],
+      "properties": {
+        "job_id": {"type": "string"},
+        "nonce": {"type": "string"},
+        "approved": {"type": "boolean"}
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "event_id": "evt-000017",
+  "session_id": "sess-example-01",
+  "device_id": "sim-cardputer-01",
+  "boot_id": "boot-example-01",
+  "sequence": 17,
+  "source_mode": "simulated",
+  "transport": "ble",
+  "target_id": "target-lab-01",
+  "operation": "ble_read_profile_value",
+  "timestamp_utc": null,
+  "clock_quality": "unknown",
+  "uptime_ms": 42000,
+  "status": "denied",
+  "details": {
+    "profile_id": "oyster-lab-v1",
+    "characteristic_id": "diag_manifest",
+    "app_status": "not_authorized",
+    "security_state": {"encrypted": false, "authenticated_pairing": false, "application_authorized": false},
+    "raw_att_status": null,
+    "value_length": 1
+  }
+}

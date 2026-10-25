@@ -1,0 +1,22 @@
+# Root tool configuration only (the installable packages are backend/ and lab/).
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-q"
+markers = [
+  "live_provider: makes a real AI provider call (skipped unless AI_API_KEY and AI_MODEL are set)",
+  "live_ble: needs a real Bluetooth adapter (skipped by default)",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["firmware", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC"]
+ignore = ["S101"]          # assert is fine in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S108", "S311"]
