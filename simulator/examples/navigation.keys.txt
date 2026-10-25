@@ -1,0 +1,63 @@
+# Replay with:  python -m oyster_ui_sim --script simulator/examples/navigation.keys.txt --out out/nav
+# Physical keys of the Cardputer (proposed bindings, UNVERIFIED on hardware). Nothing here needs a device.
+
+expect route H01
+shot 01-home
+
+# Home > Security > Wi-Fi Survey (key 1 opens the tile, Enter starts a passive survey)
+key 1
+expect route S10
+key enter
+expect route S11
+key enter
+expect text Wi-Fi survey
+wait 4200
+expect route S12
+expect text OfficeWiFi
+shot 02-wifi-results
+
+# NAV-01: Back from a leaf returns to its parent (Detail -> Results)
+key enter
+expect route S13
+shot 03-wifi-detail
+key `
+expect route S12
+
+# NAV-02: Home returns to the root from any screen (Fn+Del)
+key fn+del
+expect route H01
+
+# Unfinished module: greyed out, opens "Not available in this build"
+key 3
+expect route L10
+expect text Not available in this build
+shot 04-linux-unavailable
+key `
+expect route H01
+
+# Settings > Key tester shows the physical key and the logical action
+key 7
+key .
+key .
+key .
+key .
+key .
+key .
+key .
+key enter
+expect route P11
+key ?
+expect text Help
+key fn+del
+expect text Home
+key fn+del
+expect route H01
+
+# NAV-03: a confirmation dialog is dismissed by Back, nothing is executed
+profile preview
+goto confirm
+wait 800
+expect modal confirm
+shot 05-confirm
+key `
+expect modal none
