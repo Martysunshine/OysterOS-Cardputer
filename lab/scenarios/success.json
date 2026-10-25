@@ -1,0 +1,34 @@
+{
+  "name": "success",
+  "description": "Nominal run: Wi-Fi survey, BLE discovery, GATT inspection, a public read and a public access check all succeed. Includes one SSID and one BLE name carrying instruction-like text as plain untrusted data.",
+  "fixture_mode": "corrected",
+  "inject_prompt_strings": true,
+  "faults": {},
+  "targets": [
+    {
+      "target_id": "target-lab-01",
+      "display_name": "Oyster lab fixture",
+      "profile_id": "oyster-lab-v1",
+      "scope_version": 1,
+      "allowed_operations": ["ble_inspect_gatt", "ble_read_profile_value", "ble_observe_notifications", "ble_check_access_policy", "ble_write_lab_value", "ble_collect_diagnostics"],
+      "advertised_name": "OysterLab",
+      "service_uuid": "862f20d9-fa73-5f89-b130-86ee93e78261",
+      "address": "7c:df:a1:00:00:01",
+      "address_type": "random"
+    }
+  ],
+  "plan": [
+    {"job_id": "job-success-01", "operation": "wifi_survey", "target_id": null, "arguments": {"room_label": "lab-bench", "passive": true, "show_hidden": true}, "scope_version": 1, "deadline_s": 30, "limits": {"max_duration_s": 30, "max_results": 64}, "requires_local_confirmation": false, "nonce": null},
+    {"job_id": "job-success-02", "operation": "ble_discover", "target_id": null, "arguments": {"duration_ms": 6000}, "scope_version": 1, "deadline_s": 30, "limits": {"max_duration_s": 30}, "requires_local_confirmation": false, "nonce": null},
+    {"job_id": "job-success-03", "operation": "ble_inspect_gatt", "target_id": "target-lab-01", "arguments": {}, "scope_version": 1, "deadline_s": 30, "limits": {"max_bytes": 4096}, "requires_local_confirmation": false, "nonce": null},
+    {"job_id": "job-success-04", "operation": "ble_read_profile_value", "target_id": "target-lab-01", "arguments": {"characteristic_id": "public_sensor"}, "scope_version": 1, "deadline_s": 30, "limits": {"max_bytes": 512}, "requires_local_confirmation": false, "nonce": null},
+    {"job_id": "job-success-05", "operation": "ble_check_access_policy", "target_id": "target-lab-01", "arguments": {"test_id": "public_sensor_is_public"}, "scope_version": 1, "deadline_s": 30, "limits": {"max_bytes": 512}, "requires_local_confirmation": false, "nonce": null}
+  ],
+  "expected_outcomes": {
+    "job-success-01": "succeeded",
+    "job-success-02": "succeeded",
+    "job-success-03": "succeeded",
+    "job-success-04": "succeeded",
+    "job-success-05": "succeeded"
+  }
+}

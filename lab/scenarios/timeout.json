@@ -1,0 +1,26 @@
+{
+  "name": "timeout",
+  "description": "A profile read times out mid-operation; the event is recorded with status timeout and the job outcome is failed (no invented value).",
+  "fixture_mode": "corrected",
+  "inject_prompt_strings": false,
+  "faults": {"ble_read_profile_value": "timeout"},
+  "targets": [
+    {
+      "target_id": "target-lab-01",
+      "display_name": "Oyster lab fixture",
+      "profile_id": "oyster-lab-v1",
+      "scope_version": 1,
+      "allowed_operations": ["ble_inspect_gatt", "ble_read_profile_value", "ble_observe_notifications", "ble_check_access_policy", "ble_write_lab_value", "ble_collect_diagnostics"],
+      "advertised_name": "OysterLab",
+      "service_uuid": "862f20d9-fa73-5f89-b130-86ee93e78261",
+      "address": "7c:df:a1:00:00:01",
+      "address_type": "random"
+    }
+  ],
+  "plan": [
+    {"job_id": "job-timeout-01", "operation": "ble_read_profile_value", "target_id": "target-lab-01", "arguments": {"characteristic_id": "public_sensor"}, "scope_version": 1, "deadline_s": 30, "limits": {"max_bytes": 512}, "requires_local_confirmation": false, "nonce": null}
+  ],
+  "expected_outcomes": {
+    "job-timeout-01": "failed"
+  }
+}

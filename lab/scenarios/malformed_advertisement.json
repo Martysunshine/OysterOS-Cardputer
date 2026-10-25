@@ -1,0 +1,26 @@
+{
+  "name": "malformed_advertisement",
+  "description": "BLE discovery encounters an advertisement whose payload cannot be parsed cleanly; it is preserved as observed (malformed=true) rather than discarded or guessed.",
+  "fixture_mode": "corrected",
+  "inject_prompt_strings": false,
+  "faults": {"ble_discover": "malformed_advertisement"},
+  "targets": [
+    {
+      "target_id": "target-lab-01",
+      "display_name": "Oyster lab fixture",
+      "profile_id": "oyster-lab-v1",
+      "scope_version": 1,
+      "allowed_operations": ["ble_inspect_gatt", "ble_read_profile_value", "ble_observe_notifications", "ble_check_access_policy", "ble_write_lab_value", "ble_collect_diagnostics"],
+      "advertised_name": "OysterLab",
+      "service_uuid": "862f20d9-fa73-5f89-b130-86ee93e78261",
+      "address": "7c:df:a1:00:00:01",
+      "address_type": "random"
+    }
+  ],
+  "plan": [
+    {"job_id": "job-malformed-01", "operation": "ble_discover", "target_id": null, "arguments": {"duration_ms": 6000}, "scope_version": 1, "deadline_s": 30, "limits": {"max_duration_s": 30}, "requires_local_confirmation": false, "nonce": null}
+  ],
+  "expected_outcomes": {
+    "job-malformed-01": "succeeded"
+  }
+}

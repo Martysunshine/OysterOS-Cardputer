@@ -1,0 +1,6 @@
+{
+  "name": "withheld",
+  "description": "Blind false-positive check: resolves by seed to either vulnerable_target or corrected_target. The resolved choice is written only to a sealed file next to the session file and is never printed.",
+  "withheld": true,
+  "withheld_choices": ["vulnerable_target", "corrected_target"]
+}

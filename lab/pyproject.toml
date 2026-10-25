@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oyster-lab"
+version = "0.1.0"
+description = "Oyster Pocket lab: device simulator (contract-level virtual Cardputer) and live BLE GATT fixture"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.28,<1",
+  "jsonschema>=4.23,<5",
+]
+
+[project.optional-dependencies]
+fixture = [
+  "winrt-runtime>=3.1",
+  "winrt-Windows.Devices.Bluetooth>=3.1",
+  "winrt-Windows.Devices.Bluetooth.GenericAttributeProfile>=3.1",
+  "winrt-Windows.Devices.Bluetooth.Advertisement>=3.1",
+  "winrt-Windows.Devices.Enumeration>=3.1",
+  "winrt-Windows.Devices.Radios>=3.1",
+  "winrt-Windows.Foundation>=3.1",
+  "winrt-Windows.Foundation.Collections>=3.1",
+  "winrt-Windows.Storage.Streams>=3.1",
+  "bleak>=1.1",
+]
+
+[project.scripts]
+oyster-sim = "oyster_lab.simulator.__main__:main"
+oyster-fixture = "oyster_lab.fixture.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["oyster_lab*"]

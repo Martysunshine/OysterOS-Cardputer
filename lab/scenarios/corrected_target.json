@@ -1,0 +1,28 @@
+{
+  "name": "corrected_target",
+  "description": "Corrected fixture: diagnostics are denied with app_status not_authorized until a valid enrolled auth exchange, after which the object transfers and its SHA-256 verifies (hash_verified=true).",
+  "fixture_mode": "corrected",
+  "inject_prompt_strings": false,
+  "faults": {},
+  "targets": [
+    {
+      "target_id": "target-lab-01",
+      "display_name": "Oyster lab fixture",
+      "profile_id": "oyster-lab-v1",
+      "scope_version": 1,
+      "allowed_operations": ["ble_inspect_gatt", "ble_read_profile_value", "ble_observe_notifications", "ble_check_access_policy", "ble_write_lab_value", "ble_collect_diagnostics"],
+      "advertised_name": "OysterLab",
+      "service_uuid": "862f20d9-fa73-5f89-b130-86ee93e78261",
+      "address": "7c:df:a1:00:00:01",
+      "address_type": "random"
+    }
+  ],
+  "plan": [
+    {"job_id": "job-corr-01", "operation": "ble_check_access_policy", "target_id": "target-lab-01", "arguments": {"test_id": "restricted_diagnostics_requires_app_authorization"}, "scope_version": 1, "deadline_s": 30, "limits": {"max_bytes": 512}, "requires_local_confirmation": true, "nonce": "n-corr-01"},
+    {"job_id": "job-corr-02", "operation": "ble_collect_diagnostics", "target_id": "target-lab-01", "arguments": {"object_id": "diag-synth-0001"}, "scope_version": 1, "deadline_s": 150, "limits": {"max_bytes": 65536, "max_duration_s": 60}, "requires_local_confirmation": true, "nonce": "n-corr-02"}
+  ],
+  "expected_outcomes": {
+    "job-corr-01": "succeeded",
+    "job-corr-02": "succeeded"
+  }
+}
