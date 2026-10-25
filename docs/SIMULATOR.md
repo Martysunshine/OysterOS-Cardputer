@@ -19,13 +19,13 @@ What is exact and what is not:
 | Colours | RGB565 constants expanded to 8 bits by bit replication (panel `#192C3D` appears as `#182C39`, the quantisation the firmware sends) |
 | **Pixel parity with the device, panel colour response, legibility** | **UNVERIFIED** until compared with photographs of a Cardputer ADV |
 | **Physical key bindings** | **UNVERIFIED**: they are the firmware's proposed bindings (`input_map.cpp`); the Key tester (P11) exists to confirm them on hardware |
-| Linux, Control Deck, Smart Home screens | not in the firmware; drawn from mock data only with the preview profile, labelled `SIMULATED`, as an interpretation of the design wireframes |
+| Linux (Hosts), Control Deck, Smart Home screens | implemented in the firmware (`firmware/src/modules/`, unverified on a device); the simulator draws them from built-in mock data in both profiles, labelled `SIMULATED`, as an interpretation of the design wireframes. They are **not** read from the backend and are not the firmware's own texts or layouts |
 
 ## Running it
 
 ```powershell
 .\scripts\ui-sim.ps1                                   # window, integer scale 4 (960 x 540), nearest neighbour
-.\scripts\ui-sim.ps1 -Preview                          # mock screens for the modules the firmware lacks
+.\scripts\ui-sim.ps1 -Preview                          # also enables the Original Apps tile (its screen stays unavailable)
 .\scripts\ui-sim.ps1 -Headless -Out .\out\ui           # 40 routes x 5 states x 2 profiles = 400 PNG + 2 contact sheets
 .\scripts\ui-sim.ps1 -Script .\simulator\examples\navigation.keys.txt -Out .\out\nav
 .\scripts\ui-sim.ps1 -Test                             # pytest tests\simulator (headless, about 3 s)
@@ -36,15 +36,16 @@ What is exact and what is not:
 
 ## Profiles
 
-- **firmware** (default): behaves like the firmware build described in [`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md). The four
-  unfinished modules (Linux, Control Deck, Smart Home, Original Apps) are greyed-out tiles with a dimmed icon, and open
-  the "Not available in this build" screen (the firmware's text, checked by a test). Nothing there runs or connects.
-- **preview** (`-Preview`, `Simulator(preview=True)`): the same navigation plus the design's screens for the
-  unfinished modules, drawn from mock data: L10 host picker with online/offline indicator, L11 overview, L12 services,
-  L13 logs, D10 profile with `1: Server status` slots, D11 macro summary, D20 confirmation, D21 running job, D22
-  history, SH10 rooms, SH11 devices, SH12 IR profiles. Original Apps (O10) stays unavailable in both profiles
-  ("Original launcher integration unavailable in simulator"), as the design requires. Every frame in this profile shows
-  the `SIMULATED` banner.
+- **firmware** (default): behaves like the firmware build described in [`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md). Linux
+  (Hosts), Control Deck and Smart Home are implemented in the firmware and open their screens here, drawn from mock
+  data: L10 host picker with online/offline indicator, L11 overview, L12 services, L13 logs, D10 profile with
+  `1: Server status` slots, D11 macro summary, D20 confirmation, D21 running job, D22 history, SH10 rooms, SH11
+  devices, SH12 IR profiles. The mock data and the layouts are the simulator's interpretation of the design, not the
+  firmware's output, so every frame shows the `SIMULATED` banner and the Home tiles say `mock data`. Original Apps
+  is the one module that is unavailable in the build: its tile is greyed out with a dimmed icon and opens the
+  "Not available in this build" screen (the firmware's text, checked by a test). Nothing there runs or connects.
+- **preview** (`-Preview`, `Simulator(preview=True)`): the same screens, plus an enabled Original Apps tile whose
+  screen (O10) still says "Original launcher integration unavailable in simulator", as the design requires.
 
 The banner of the status bar is `SIMULATED` throughout, because every value is a fixture (`START FAILED` when the
 "BLE did not start" fault is switched on). The right side of the status bar derives from the simulated connectivity
@@ -78,18 +79,18 @@ Help route. Item rows themselves come from the view builders, because their text
 | ask_entry | Ask Oyster | text | ai | implemented | A10 | - | - |
 | A11 | Ask Oyster run | message | ai | implemented | A10 | - | ai |
 | A12 | Ask Oyster answer | message | ai | implemented | A10 | - | ai |
-| L10 | Linux | list | linux | unavailable | H01 | host->L11 | - |
-| L11 | Linux host | list | linux | unavailable | L10 | health->msg, services->L12, logs->L13 | - |
-| L12 | Services | list | linux | unavailable | L11 | detail->msg | - |
-| L13 | Logs | message | linux | unavailable | L11 | - | - |
-| D10 | Control Deck | list | deck | unavailable | H01 | macro->D11, history->D22 | - |
-| D11 | Macro | message | deck | unavailable | D10 | confirm->D20, run->D21 | - |
-| D20 | Confirm macro | confirm (modal) | deck | unavailable | D11 | - | - |
-| D21 | Job | progress | deck | unavailable | D11 | - | deck |
-| D22 | Job history | list | deck | unavailable | D10 | - | - |
-| SH10 | Rooms | list | smart | unavailable | H01 | room->SH11 | - |
-| SH11 | Devices | list | smart | unavailable | SH10 | ir->SH12 | - |
-| SH12 | IR profiles | list | smart | unavailable | SH11 | - | ir |
+| L10 | Linux | list | linux | implemented | H01 | host->L11 | - |
+| L11 | Linux host | list | linux | implemented | L10 | health->msg, services->L12, logs->L13 | - |
+| L12 | Services | list | linux | implemented | L11 | detail->msg | - |
+| L13 | Logs | message | linux | implemented | L11 | - | - |
+| D10 | Control Deck | list | deck | implemented | H01 | macro->D11, history->D22 | - |
+| D11 | Macro | message | deck | implemented | D10 | confirm->D20, run->D21 | - |
+| D20 | Confirm macro | confirm (modal) | deck | implemented | D11 | - | - |
+| D21 | Job | progress | deck | implemented | D11 | - | deck |
+| D22 | Job history | list | deck | implemented | D10 | - | - |
+| SH10 | Rooms | list | smart | implemented | H01 | room->SH11 | - |
+| SH11 | Devices | list | smart | implemented | SH10 | ir->SH12 | - |
+| SH12 | IR profiles | list | smart | implemented | SH11 | - | ir |
 | O10 | Original Apps | message | original | unavailable | H01 | - | - |
 | P10 | Settings | list | settings | implemented | H01 | backend, storage, diagnostics, keyboard, keytest->P11, about (settings_*) | - |
 | P11 | Key tester [P11] | detail | settings | implemented | P10 | - | - |
@@ -209,7 +210,7 @@ reconciled with the same idempotency key, no second run), HOME-01, AI-01, ORIG-0
 
 The tests parse the firmware and the design documents and fail on drift: `ui_theme.h` (tokens, geometry),
 `UI_SCREEN_MAP.md` (implemented vs unavailable per design ID: `test_screen_map_and_simulator_agree_on_implemented_versus_unavailable_screens`),
-`app_controller.cpp` (Home tiles, the four "Not available in this build" texts, the static row labels),
+`app_controller.cpp` (Home tiles, the "Not available in this build" texts, the static row labels),
 `input_map.cpp` (arrow keys, Back, Help, Home and Cancel chords), `assets_gen.cpp` (icons) and the M5GFX font tables.
 
 ### Traceability (menu, route, action, result)
@@ -220,9 +221,9 @@ The tests parse the firmware and the design documents and fail on drift: `ui_the
 | Home > Security > Bluetooth Explorer | S21 | `start_ble` passive / active | S22 results, S23 detail | `BLE: no discovery yet`, `!Bluetooth: BLE off` | `test_ble_discovery_failure_is_reported` |
 | Home > Oyster AI > Ask a question | A10, ask_entry | question (validated), A11, A12 | A12 answer pages | `!AI unavailable` (offline), `Status: failed` | `test_oyster_ai_refuses_*`, `test_a_failed_ai_run_*` |
 | AI answer with a pending action | confirm modal | local confirmation | Inspect GATT runs only after approval | rejection runs nothing | `test_the_ai_pending_action_*` |
-| Home > Linux (preview) | L10, L11, L12, L13 | read-only, never confirmed | health, services, logs | `!Linux: offline`, offline host | `test_net_01_*`, `test_linux_health_*` |
-| Home > Control Deck (preview) | D10, D11, D20, D21, D22 | slot opens summary; Enter runs; D20 confirms | job id and final state | failed, timed out, unknown, cancelled | `test_job_01_*`, `test_job_03_*`, `test_deck_*` |
-| Home > Smart Home (preview) | SH10, SH11, SH12 | toggle only an available device; IR send | acknowledged state; `IR sent (no device feedback)` | `unavailable: not switched` | `test_home_01_*` |
+| Home > Linux (mock data) | L10, L11, L12, L13 | read-only, never confirmed | health, services, logs | `!Linux: offline`, offline host | `test_net_01_*`, `test_linux_health_*` |
+| Home > Control Deck (mock data) | D10, D11, D20, D21, D22 | slot opens summary; Enter runs; D20 confirms | job id and final state | failed, timed out, unknown, cancelled | `test_job_01_*`, `test_job_03_*`, `test_deck_*` |
+| Home > Smart Home (mock data) | SH10, SH11, SH12 | toggle only an available device; IR send | acknowledged state; `IR sent (no device feedback)` | `unavailable: not switched` | `test_home_01_*` |
 | Home > Original Apps | O10 | none | explicit unavailable text | - | `test_orig_01_*` |
 | Home > Settings > Key tester | P10, P11 | any key | physical key and logical action | - | `test_key_tester_*` |
 
@@ -233,8 +234,11 @@ The tests parse the firmware and the design documents and fail on drift: `ui_the
 - The simulator re-implements the firmware's UI logic; it does not run the firmware code. A change in
   `app_controller.cpp` that the drift tests do not look at will not show up here until someone updates the simulator.
 - Mock backends only: JOB-02 (unauthorized macro, audit entry), PRES-01/ORIG-02 (original-app preservation and switch)
-  need a real backend or device and are not simulated. There is no voice, schedule or Home Assistant screen.
-- Linux, Control Deck and Smart Home screens in the preview profile illustrate the design wireframes with invented
-  fixtures; they are not behaviour of the firmware or the backend (neither exists yet).
+  need a real backend or device and are not simulated. There is no voice or schedule screen.
+- Linux (Hosts), Control Deck and Smart Home screens illustrate the design wireframes with invented fixtures: they
+  are not the output of the firmware modules (written, unverified on a device) and not data from the backend. Their
+  real texts and flows are in [`COMPANION_API.md`](COMPANION_API.md), [`CONTROL_DECK.md`](CONTROL_DECK.md) and
+  [`HOME_ASSISTANT.md`](HOME_ASSISTANT.md), and the pages of the firmware are listed in
+  [`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md).
 - The Alt-as-Fn emulation in the window depends on how the desktop delivers Alt key events; the replay scripts and
   the on-screen buttons do not.

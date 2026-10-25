@@ -196,12 +196,14 @@ def test_disabled_modules_are_greyed_out_on_home_in_the_firmware_profile(sim, pr
     th = theme()
     sim.render()
     labels = {r.text: r.enabled for r in sim.view().rows}
+    # Hosts (Linux), Control Deck and Smart Home are implemented in the firmware (unverified on a device);
+    # only Original Apps is still a greyed-out tile.
     assert labels == {
         "Security": True,
-        "Control": False,
+        "Control": True,
         "Oyster AI": True,
-        "SmartHome": False,
-        "Linux": False,
+        "SmartHome": True,
+        "Linux": True,
         "Original": False,
         "Settings": True,
         "Help": True,
@@ -209,7 +211,8 @@ def test_disabled_modules_are_greyed_out_on_home_in_the_firmware_profile(sim, pr
     # Same frame, enabled vs disabled tile: the disabled label uses the muted colour and the icon is dimmed.
     preview.render()
     assert all(r.enabled for r in preview.view().rows)
-    cell = (th.PadX + th.InnerW // 2 + 4, th.ContentY + 4, 100, 24)  # the Control tile (row 0, column 1)
+    # The Original Apps tile (row 2, column 1).
+    cell = (th.PadX + th.InnerW // 2 + 4, th.ContentY + 2 * th.TileH + 4, 100, 24)
     a = sim.ui.screen.image(1).crop((cell[0], cell[1], cell[0] + cell[2], cell[1] + cell[3]))
     b = preview.ui.screen.image(1).crop((cell[0], cell[1], cell[0] + cell[2], cell[1] + cell[3]))
     assert a.tobytes() != b.tobytes()

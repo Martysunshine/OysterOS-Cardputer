@@ -72,6 +72,11 @@ Useful tools:
 | HV-28 | Flash gate: `firmware-flash.ps1` refuses without a verified backup of that chip, passes with one | PARTIAL | 2026-10-25 | 0cc446875ad8 | Passed with the verified backup and the upload hash-verified. The refusal path was not tried on the device |
 | HV-29 | Boot splash drawn once at start-up, then the Home screen (heading `OYSTER OS`, tile grid, greyed-out tiles) | PARTIAL (owner-observed) | 2026-10-25 | 0cc446875ad8 | Boot, splash, Home and the four greyed-out tiles were seen on the real display and looked right; no photographs, no flicker/colour measurements. Oyster AI showed unavailable while the device was not yet provisioned |
 | HV-30 | Start screen waits for any key; the G0 button shows the same logo screen as a lock, any key returns to the same screen | UNVERIFIED | | | |
+| HV-31 | Hosts (Home 3): host list, overview (CPU, memory, disk, uptime, state, age), services, Logs page, tile text `N hosts` / `no hosts` / `offline`, failure texts | UNVERIFIED | | | |
+| HV-32 | Control Deck (Home 4) on the device: profiles and slots, run a slot, impactful confirmation (approve and reject), 700 ms key guard, emergency cancel, lost-answer text, history | UNVERIFIED | | | |
+| HV-33 | Control Deck on the real PC (`OYSTER_DECK_EXECUTOR=windows`): media keys, lock, Wake-on-LAN, service restart | UNVERIFIED | | | |
+| HV-34 | Smart Home IR (Home 5 > IR Remote): IR LED on GPIO44, each TV family against the owner's TV, one frame per key | UNVERIFIED | | | |
+| HV-35 | Smart Home with Home Assistant: unconfigured text first, then a real instance (rooms, devices, an action, impactful confirmation, failure paths) | UNVERIFIED | | | |
 
 ## How to run each check
 
@@ -298,12 +303,15 @@ them.
 2. The first screen is Home, headed `OYSTER OS`, with a two-column tile grid: Security, Oyster AI and Linux
    on the left; Control Deck, Smart Home and Original Apps on the right; Settings and Help in a fourth row
    that scrolls into view. Check icons, labels, the selection stripe and the number shortcuts `1` to `8`.
-3. Open Linux, Control Deck, Smart Home and Original Apps. Each tile must look greyed out and open a
-   "Not available in this build" screen that Back leaves. Nothing may pretend to connect or run.
+3. Open Original Apps. In the default build the tile reads `not set up` and opens a page that says what is
+   missing and which script sets it up (dual boot, docs/DUAL_BOOT.md); Back leaves, and nothing may pretend to
+   boot or connect. (The Linux, Control Deck and Smart Home tiles used to be greyed out too; they now open
+   module pages, checked in HV-31 to HV-35. The owner observation recorded for HV-29 was made on a build in which
+   all four were greyed out.)
 4. Check the Oyster AI tile against the backend state (connected, or unavailable with a reason).
 
-**Pass:** the splash appears without artefacts, waits for a key, Home is readable at 240x135, and the four unbuilt
-modules are visibly unavailable. Record anything clipped or hard to read, with photographs.
+**Pass:** the splash appears without artefacts, waits for a key, Home is readable at 240x135, and the one unbuilt
+module (Original Apps) is visibly unavailable. Record anything clipped or hard to read, with photographs.
 
 
 ### HV-30 Start screen and G0 lock
@@ -320,6 +328,161 @@ modules are visibly unavailable. Record anything clipped or hard to read, with p
 
 **Pass:** all of the above behave as described; note anything unclear. The lock is a screen cover, not an
 authentication: any key opens it.
+
+### HV-31 Hosts
+
+Home tile 3 ("Linux", the Hosts module, screens L10-L13). Written and host-tested (28 parser and text cases), never
+run on a Cardputer. Read-only: nothing is run on any host.
+
+Prerequisites: the backend runs (`.\scripts\backend.ps1`), the device is provisioned and online (HV-10), and the
+backend PC is enrolled as a host that this device may see, for example
+`python -m oyster.cli seed-demo --id <device-id> --no-profile` (adapter `local`; add `--services <name>` with the
+name of a Windows service on your PC to test the services page). Details: [`COMPANION_API.md`](COMPANION_API.md).
+
+1. **Tile.** Home tile 3 reads `1 host` (or `N hosts`) once the backend has answered. With no host shared with this
+   device it reads `no hosts`; with the backend stopped or the device not configured it reads `offline` (or
+   `error` if the backend refused the list). It must never show a count it did not receive.
+2. **List and overview.** Enter on the tile opens the host list; Enter on a host opens the overview: CPU %, memory %,
+   disk %, uptime, `State ok, N s ago`. Compare the numbers with Task Manager on the backend PC (same order of
+   magnitude, not identical: they are samples). Wait ten seconds and press `r`: the age restarts and the values
+   update.
+3. **Services.** With a service enrolled, Enter on the overview opens the services list; Enter on a row shows
+   `name: running` (or `inactive`, `unknown`) and agrees with the Windows service list. Without services the
+   overview says `No services listed`.
+4. **Logs.** `l` on the overview opens a page that says `No log source.` and that only health is shared; there is no
+   log text and no input. Back returns.
+5. **Back.** Back goes up exactly one level (services > overview > host list > Home) and never exits the module
+   from a deeper level.
+6. **Failure texts.** On the overview stop the backend and press `r`: a plain text names the problem (offline,
+   connection lost or backend error) and Back still works; restart the backend and `r` recovers. Share no host with
+   the device: the list page says `No hosts shared with this device`. On Windows the load average does not exist: if
+   `load_1m` is enrolled, the overview names it as missing and the state reads `partial`.
+
+**Pass:** every page above shows what the backend reports (no invented value), each failure is a clear text rather
+than a hang, no key runs anything on a host. Record failures with the text that was shown.
+
+### HV-32 Control Deck on the device
+
+Home tile 4 (screens D10, D11, D20, D21, D22). Written and host-tested (35 parser and text cases; 486 backend tests),
+never run on a Cardputer. Run this first with the default `OYSTER_DECK_EXECUTOR=mock`: nothing is executed on the PC,
+and every result says so. The real PC is HV-33.
+
+Prerequisites: backend running, device online, and the seed profile for the device:
+`python -m oyster.cli seed-demo --id <device-id>` (profile `desk`: 1 PC health, 2 Play/Pause, 3 Next, 4 Prev,
+5 Vol+, 6 Vol-, 7 Mute, 8 Lock PC). Details and states: [`CONTROL_DECK.md`](CONTROL_DECK.md).
+
+1. **Profiles and slots.** The tile shows the number of profiles (`no profile` when none, `offline` when the backend
+   cannot be reached). Enter opens the profile list (Desk, then History); Enter on Desk lists slots `1` to `8`; only
+   slot 8 has the `*` that marks an impactful slot.
+2. **Run a slot.** Press `2`. A working page appears, then the result page with state `succeeded` and, for the mock
+   executor, `Mock executor: nothing was run on the PC.` The owner history on the backend
+   (`GET /v1/deck/history`, loopback) lists one job. A second press of `2` makes a second job (a fresh
+   Idempotency-Key per key press); neither press is retried by the device.
+3. **Confirm.** Press `8`. A confirmation page names `Lock PC`, the target `this PC` and the effect. Press Enter
+   right away (within 0.7 s of the page appearing) or press other keys: the page must not answer. After a second,
+   Enter approves: the result is `succeeded` (mock) and the backend job passed `awaiting_confirmation` ->
+   `running` with a nonce it did not log.
+4. **Reject.** Press `8`, wait a second, press Back: the job is `cancelled` on the backend and nothing ran. Repeat
+   with Home (`Fn`+`Del`) and with the emergency cancel (`Fn`+`` ` `` or `Ctrl`+`C`): each must reject, never
+   approve.
+5. **Expiry.** Press `8` and leave the page alone: the page counts down and after about 117 s (the backend's 120 s
+   window minus 3 s) it rejects by itself. The backend job ends `cancelled` (or `expired` at 120 s if the
+   cancellation could not be delivered) and nothing ran; the device never approves by default.
+6. **Lost answer.** On the working page press Back: the device stops waiting, and History shows the job exactly once
+   (the action may have run). If you can cut the connection while the working page shows (for example switch the
+   access point off for a second), the result page must say `Status unknown`; Enter then repeats the same request with
+   the same key, and the backend must end up with one job, not two. An `unknown_outcome` job is never retried by the
+   device.
+7. **History and failures.** History lists the last 10 finished jobs, newest first; Enter opens one in the result
+   page. With the backend stopped, pressing a slot says nothing was sent. A rejected device token (re-enrolled
+   device) says so.
+
+**Pass:** a non-impactful slot runs at once, an impactful slot never runs without the on-device approval, keys in
+the first 0.7 s never answer the page, Back, Home and the emergency cancel reject, an expired page runs nothing,
+and a lost answer never creates a second job.
+
+### HV-33 Control Deck on the real PC
+
+The backend part of the Control Deck acting on the PC it runs on (`executor_windows.py`). Only read-only probes have
+run on a real PC (host health, service state, a service name that does not exist); **media keys, the lock,
+Wake-on-LAN and service restart have only run against a fake OS layer.** Set `OYSTER_DECK_EXECUTOR=windows` in
+`backend/.env` and start the backend yourself in your own signed-in session, not elevated and not as a service
+(otherwise Windows reports `input_blocked`). Variables: `.env.example`.
+
+1. **Health.** Slot 1 returns a summary such as `cpu 12% mem 63% disk 71%` that agrees with Task Manager. Jobs are
+   labelled `executor: windows`.
+2. **Media keys.** With any media player playing: slot 2 pauses and resumes it, slots 3 and 4 skip, slots 5 and 6
+   change the volume by one Windows step (about 2 %) per press, slot 7 mutes and unmutes. The job text is
+   `key sent; player reaction not checked`: which player reacts is Windows' choice; record which one did.
+3. **Lock.** Slot 8 asks on the Cardputer first; after approval the PC locks. Unlock it; the job is `succeeded`
+   (`lock request accepted by Windows`). Without approval nothing locks.
+4. **Wake-on-LAN (optional).** Set `OYSTER_DECK_WOL_HOSTS=<host_id>=<MAC>` for a machine you own that is switched
+   off with Wake-on-LAN enabled, and define a profile slot with a `wake_on_lan` action for that host (owner route
+   `PUT /v1/deck/profiles/{id}`). After approval the machine should start; the job text only says
+   `magic packet sent; wake-up not verified`.
+5. **Service restart (optional).** Only for a harmless service of your own, listed in
+   `OYSTER_DECK_RESTART_SERVICES` and in the profile. Not elevated, the job must end `failed` with
+   `needs administrator rights; nothing was restarted`; with the backend started elevated by you, the service
+   restarts, or the job ends `unknown_outcome` if a state was not reached in time.
+
+**Pass:** each action above does what is written or fails with the stated text; nothing runs for a host, key or
+service that is not allowlisted. Mark each action PASS, FAIL or BLOCKED separately in the notes.
+
+### HV-34 Smart Home: IR remote
+
+Home tile 5 > `IR Remote` (screens SH10-SH12). Written and host-tested (24 cases, shared with the Home Assistant
+parsers); **no IR code has been tried on a real TV and the IR LED pin is an assumption.** Needs no backend.
+
+1. **Rooms and families.** Tile 5 opens the rooms list with `IR Remote` first; Enter lists `TV Samsung`, `TV LG`,
+   `TV Sony`, `TV NEC (Toshiba type)`, `TV Philips (RC5)` and `About IR codes`; Enter on a family lists `1 Power`,
+   `2 Vol+`, `3 Vol-`, `4 Mute`, `5 Ch+`, `6 Ch-`.
+2. **LED pin (GPIO44).** Point the Cardputer's IR LED at a phone camera (some front cameras filter infrared; try the
+   rear one) and press Power: the LED should flicker while the strip says `sending`. No light: GPIO44 is not the
+   LED on this unit (`ir::kTxPin` in `ir_remote.h`); stop here and record it, because no family can work then.
+3. **Each family.** Against the owner's TV, try Power, Vol+, Vol-, Mute, Ch+ and Ch- on the family that matches the
+   brand, then on the others. Record per family and key: reacted, did not react, or reacted wrongly. A family that
+   does not react needs its own code row (`kBrands` in `ir_codes.cpp`).
+4. **One frame per key.** One key press sends one burst: the TV toggles power once and moves volume one step per
+   press; holding Enter or a number key does not repeat. On a phone video the LED shows one burst of about 70 ms
+   (about 140 ms for the Sony family, which sends three frames).
+5. **Honest text.** The notice reads `Sent: Power (IR, no reply)`, never `done`, and no state of the TV is shown. While
+   a Wi-Fi survey runs, a key press says `Radio busy; try again` and sends nothing. `1`-`6` send the same frames as
+   the rows.
+
+**Pass:** the LED flickers on a key press, at least one family drives the owner's TV (state which keys), one press is
+one burst, and the screen never claims more than `Sent`. A family that never reacts stays UNVERIFIED or FAIL for that
+TV; it does not make the module PASS by itself.
+
+### HV-35 Smart Home with Home Assistant
+
+Home tile 5, Home Assistant rooms. The backend bridge is tested against a fake Home Assistant only (170 backend and
+24 host tests); **Home Assistant is not configured yet (no URL, no token) and nothing has run against a real
+instance.** Setup, allowlist and the full checklist: [`HOME_ASSISTANT.md`](HOME_ASSISTANT.md) (its items 1 and 2 are
+HV-34; items 3 to 6 are this check).
+
+Part A, not set up (no `HOME_ASSISTANT_URL` or `HOME_ASSISTANT_TOKEN` in `backend/.env`):
+
+1. The tile status reads `IR only`. The rooms list shows `IR Remote`, then one muted status row (`not set up`).
+2. Enter on that row explains which names are missing (URL, token or allowlist) without printing any value.
+   `GET /v1/home/status` (owner, loopback) lists the same problems and never shows the URL or the token.
+3. The IR keys still work (HV-34) and Back and Home work.
+
+Part B, a real instance (use a test light or switch first):
+
+1. Set `HOME_ASSISTANT_URL`, `HOME_ASSISTANT_TOKEN` and an allowlist with real entity ids (start from
+   `examples/home_allowlist.example.json`), restart the backend. The tile reads `IR+HA`; the rooms and their device
+   states match Home Assistant.
+2. Toggle a light from the device: the light changes and the notice shows the state Home Assistant reports.
+3. Impactful entity (lock, cover; alarm panels can only be armed): the Confirm page appears; Back (or Home, or the
+   emergency cancel) sends nothing; after 0.7 s Enter acts. `GET /v1/home/audit` shows the request with
+   `confirmed: true` after a `pending` row, and the rejected attempt leaves no action.
+4. Failure paths, none of which may block the IR keys: stop Home Assistant (rooms show `offline`); use a wrong token
+   (`rejected the token`); stop the backend (`No answer from the PC backend`); a lost answer to an action reads
+   `No answer; result unknown. Check it` and the action is not repeated by the device.
+5. The URL and the token appear nowhere: not on the screen, not in the serial log, not in `GET /v1/home/status`.
+
+**Pass:** Part A and every step of Part B behave as written. Until Part B has been run against a real instance, the
+Home Assistant half of this module stays UNVERIFIED even if Part A passes.
 
 ### HV-24 to HV-26 (after M4 exists)
 

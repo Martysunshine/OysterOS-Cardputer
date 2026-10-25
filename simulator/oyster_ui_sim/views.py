@@ -1,6 +1,8 @@
 """View builders: route + state -> what the screen shows. Texts and row formats follow
-firmware/src/app_controller.cpp where the firmware has the screen; the screens the firmware does not have
-(Linux, Control Deck, Smart Home) are drawn from mock data only when the simulator runs with preview=True.
+firmware/src/app_controller.cpp where the firmware has the screen. The Linux (Hosts), Control Deck and Smart
+Home screens are implemented in the firmware (src/modules/, unverified on a device) and are drawn here from
+mock data (an interpretation of the design wireframes, labelled SIMULATED), not from the backend. Original
+Apps stays unavailable and is drawn only when the simulator runs with preview=True.
 
 Every route supports the five states (routes.STATES). A builder handles the states it knows itself; the others
 fall back to `generic()`, so "loading / error / empty / disabled" are always drawn the same way."""
@@ -78,15 +80,16 @@ def _msg(title: str, body: str, state: str = "normal", footer: tuple[str, str] |
 
 
 def unavailable(module: str, rt: Route) -> View:
-    title, body = UNAVAILABLE_TEXT.get(
-        module,
-        (
-            f"{rt.title}: unavailable",
-            "Not available in this build.\n"
-            + (
-                rt.disabled
-                or "This feature is switched off in the simulated state. Nothing here runs or connects."
-            ),
+    # The firmware's own explanation exists only for the module that is unavailable in the build (Original
+    # Apps). For an implemented module in the "disabled" state the text says it is switched off in the
+    # simulation, not that the build lacks it.
+    known = UNAVAILABLE_TEXT.get(module) if rt.availability == UNAVAILABLE else None
+    title, body = known or (
+        f"{rt.title}: unavailable",
+        "Not available in this build.\n"
+        + (
+            rt.disabled
+            or "This feature is switched off in the simulated state. Nothing here runs or connects."
         ),
     )
     return _msg(title, body, "disabled")
@@ -128,7 +131,9 @@ def generic(sim: Simulator, rt: Route, state: str) -> View:
 def home(sim: Simulator, rt: Route, state: str) -> View:
     rows: list[Row] = []
     for key, label, icon, number, module in HOME_TILES:
-        built = module in ("home", "security", "ai", "settings", "system")
+        # Hosts (linux), Control Deck and Smart Home are in the firmware (unverified on a device); here they
+        # run on mock data. Only Original Apps stays greyed out, except in the preview profile.
+        built = module in ("home", "security", "ai", "settings", "system", "linux", "deck", "smart")
         enabled = built or (sim.preview and state != "disabled")
         if key == "security":
             what = "scanning" if sim.task and sim.task.kind in ("wifi", "ble") else "Wi-Fi, BLE"
@@ -138,6 +143,8 @@ def home(sim: Simulator, rt: Route, state: str) -> View:
             what = "device"
         elif key == "help":
             what = "keys"
+        elif module in ("linux", "deck", "smart"):
+            what = "mock data"  # the tile text of the firmware comes from the backend; here it is a fixture
         else:
             what = "preview" if enabled else "unavailable"
         rows.append(

@@ -45,7 +45,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--out", type=Path, help="output directory for PNG files")
     ap.add_argument("--scale", type=int, default=4, help="integer pixel scale (default 4)")
-    ap.add_argument("--preview", action="store_true", help="mock screens for modules the firmware lacks")
+    ap.add_argument(
+        "--preview",
+        action="store_true",
+        help="also enable the Original Apps tile (its screen stays unavailable)",
+    )
     ap.add_argument("--routes", action="store_true", help="print the route table as Markdown")
     ap.add_argument("--keys", action="store_true", help="print the key table as Markdown")
     args = ap.parse_args(argv)

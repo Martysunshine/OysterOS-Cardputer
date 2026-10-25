@@ -172,7 +172,7 @@ Manual step - unverified until run. The structure of the screens is in [`UI_SCRE
 
 | Symptom | Meaning / fix |
 | --- | --- |
-| The Home tiles Linux, Control Deck, Smart Home or Original Apps are greyed out and open "Not available in this build" | Intended. Those modules of the design are not built, so nothing connects or runs. Back returns |
+| A module tile (Linux/Hosts, Control Deck, Smart Home) says offline, not set up or "no hosts" | Intended until the device is provisioned and the backend is running (`scripts/oyster-up.ps1`), and until a host or profile is seeded (`oyster seed-demo --id <device>`). Original Apps says "not set up" until the dual-boot layout is installed (docs/DUAL_BOOT.md) |
 | Entries in Security > Assess are muted and say "not in build" | Intended. The M4 checks have no device side yet ([`CAPABILITY_MATRIX.md`](CAPABILITY_MATRIX.md)) |
 | Home (`Fn`+`Del`, press `Fn` first) or Help (`?`) does nothing | Both bindings are proposed and unverified. Open **Settings > Key tester** to see which physical keys arrive and which action they resolve to. Meanwhile use Back (`` ` `` or `Del`) one level at a time and the Help tile (8) on the Home screen. Record the result under HV-03 in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) |
 | The serial log says `display sprites unavailable (out of memory)` | The 7,680 B drawing sprite (one 240x16 band) could not be allocated, so screen output is switched off while the rest keeps running. Reboot; if it repeats, record the heap numbers of the boot event under HV-05 |

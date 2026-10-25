@@ -17,7 +17,10 @@ The implementation was written and compiled on a PC; **no Cardputer has been att
 |---|---|
 | Security Toolkit | **Wi-Fi Survey** and **BLE Explorer** are written in the firmware (Home > Security; 2.4 GHz only; BLE inspection of locally enrolled lab targets only). Findings are stored as evidence on the microSD card and in the backend, and listed under **Saved Findings**. Unverified on hardware. |
 | Oyster AI | Runs through the companion backend (FastAPI on your PC, Groq through an OpenAI-compatible API); the **Oyster AI** tile on the device asks and shows the answer. The Groq adapter is tested against mocked HTTP and a fake provider, and in the lab demo against a real Groq model with a simulated device; it has not run with the Cardputer yet. Text only. |
-| Linux Console, Smart Control Deck, Smart Home, Original Apps | **Not built on the device.** Their Home tiles are greyed out and open "Not available in this build"; they never show fake screens. The backend already has a read-only host-health API and an allowlisted Control Deck job API, both with mock executors only ([Companion API](docs/COMPANION_API.md), [Control Deck](docs/CONTROL_DECK.md)). |
+| Linux Console (the **Hosts** tile) | Written in the firmware and the backend, **unverified on the device**: host list, overview (CPU, memory, disk, uptime), services and a Logs page that says plainly there is no log source. Read-only; the backend can read the PC it runs on ([Companion API](docs/COMPANION_API.md)). No remote hosts, no logs. |
+| Smart Control Deck | Written in the firmware and the backend, **unverified on the device**: profiles, slots 1-9, a local confirmation for impactful slots, result and history. The backend has a mock executor (default) and a Windows executor for the PC it runs on (media keys, lock, Wake-on-LAN, service restart); the Windows actions are unit-tested only, not tried in a real session ([Control Deck](docs/CONTROL_DECK.md)). |
+| Smart Home | Written in the firmware and the backend, **unverified on the device**: an IR remote for five TV families (Cardputer IR LED, pin assumed, no code tried on a real TV) and a Home Assistant bridge with an owner-written allowlist. Home Assistant is not configured yet, and the screen says so ([Smart Home](docs/HOME_ASSISTANT.md)). |
+| Original Apps | **Not built on the device.** Its Home tile is greyed out and opens "Not available in this build"; it never shows a fake screen. |
 | Settings & Device Tools | Backend state, storage, diagnostics, keyboard help and a key tester, plus USB serial provisioning, are written, unverified. |
 
 **The current firmware build is a full-flash image.** It carries its own partition table without OTA and replaces the factory firmware, the launcher and the original apps. That does not yet meet the principle above ("keep the original software"): a launcher-compatible build has not been made. Until then the safety net is a verified backup: `scripts\firmware-flash.ps1` refuses to flash a chip that has no matching backup made by `scripts\firmware-backup.ps1`. Details and the reconciliation with the design constraints: [`docs/INTEGRATION.md`](docs/INTEGRATION.md).
@@ -239,8 +242,9 @@ The implementation (Oyster Pocket):
 | [`docs/HARDWARE_VERIFICATION.md`](docs/HARDWARE_VERIFICATION.md) | Checklist for the real device, with a results table |
 | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Certificates, COM ports, download mode, restoring the backup |
 | [`docs/SIMULATOR.md`](docs/SIMULATOR.md) | The 240x135 screen simulator: run it, routes and states, what is and is not verified |
-| [`docs/COMPANION_API.md`](docs/COMPANION_API.md) | Pairing and read-only host health (mock adapters) |
-| [`docs/CONTROL_DECK.md`](docs/CONTROL_DECK.md) | Allowlisted jobs with local confirmation (mock executor) |
+| [`docs/COMPANION_API.md`](docs/COMPANION_API.md) | Pairing and read-only host health (mock adapter and a `local` adapter for the backend PC) |
+| [`docs/CONTROL_DECK.md`](docs/CONTROL_DECK.md) | Allowlisted jobs with local confirmation (mock and Windows executors), the device flow |
+| [`docs/HOME_ASSISTANT.md`](docs/HOME_ASSISTANT.md) | Smart Home: IR remote, Home Assistant bridge, allowlist, setup and verification checklist |
 | [`docs/API.md`](docs/API.md), [`docs/PROVISIONING.md`](docs/PROVISIONING.md), [`docs/BLE_LAB_PROFILE.md`](docs/BLE_LAB_PROFILE.md) | HTTP API, USB serial provisioning, lab GATT profile |
 | [`docs/PRIVACY.md`](docs/PRIVACY.md), [`docs/BUILD_MATRIX.md`](docs/BUILD_MATRIX.md), [`docs/adr/`](docs/adr/) | Data sent to the AI provider, pinned toolchain, architecture decisions |
 

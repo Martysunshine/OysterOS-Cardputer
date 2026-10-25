@@ -27,11 +27,11 @@ expect route S12
 key fn+del
 expect route H01
 
-# Unfinished module: greyed out, opens "Not available in this build"
-key 3
-expect route L10
+# Unfinished module (Original Apps): greyed out, opens "Not available in this build"
+key 6
+expect route O10
 expect text Not available in this build
-shot 04-linux-unavailable
+shot 04-original-apps-unavailable
 key `
 expect route H01
 

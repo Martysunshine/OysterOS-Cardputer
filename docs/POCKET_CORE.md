@@ -72,7 +72,7 @@ a tile is its shortcut key on the Home screen:
 | --- | --- |
 | 1 Security | Wi-Fi Survey, Bluetooth Explorer, Saved Findings, Enrolled Targets, Assess |
 | 2 Oyster AI | Ask a question, Latest AI run, Cancel AI run, Sync evidence now |
-| 3 Linux, 4 Control Deck, 5 Smart Home, 6 Original Apps | greyed out; each opens "Not available in this build" (these modules are not built) |
+| 3 Linux (Hosts), 4 Control Deck, 5 Smart Home, 6 Original Apps | module pages written, unverified on the device: read-only host health, allowlisted PC actions with local confirmation, IR remote and Home Assistant, and booting the original firmware in the dual-boot build (the default build shows "not set up") |
 | 7 Settings | Backend, Brightness, Storage, Diagnostics, Sync, New session, Keyboard, Key tester, About |
 | 8 Help | the key bindings and a hint for the screen it was opened from |
 

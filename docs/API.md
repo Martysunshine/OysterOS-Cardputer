@@ -44,10 +44,25 @@ is given.
 
 More routes, documented with their own limits and tests:
 
-- Pairing and read-only host health (`/v1/pair`, `/v1/hosts`, `/v1/admin/hosts`, `/v1/admin/pairing`, `/v1/admin/audit`): [`COMPANION_API.md`](COMPANION_API.md).
-- Control Deck (`/v1/deck/...`: profiles, slot runs, confirmation, history, owner administration): [`CONTROL_DECK.md`](CONTROL_DECK.md).
+- Pairing and read-only host health (`/v1/pair`, `/v1/hosts`, `/v1/admin/hosts`, `/v1/admin/pairing`, `/v1/admin/audit`; adapters `mock` and `local`, the backend PC read through psutil): [`COMPANION_API.md`](COMPANION_API.md).
+- Control Deck (`/v1/deck/...`: profiles, slot runs, confirmation, history, owner administration; executors `mock` and `windows`, chosen by `OYSTER_DECK_EXECUTOR`): [`CONTROL_DECK.md`](CONTROL_DECK.md).
+- Smart Home / Home Assistant bridge (`/v1/home/...`, summarised below): [`HOME_ASSISTANT.md`](HOME_ASSISTANT.md).
 
-Both follow the listener rules above: device routes on both listeners, owner routes on the loopback listener only.
+All three follow the listener rules above: device routes on both listeners, owner routes on the loopback listener only. The firmware modules that call them (Hosts, Control Deck, Smart Home) are written and host-tested; none has run on a Cardputer.
+
+### Home Assistant bridge routes (`/v1/home/...`)
+
+| Method and path | Auth | Request / response |
+| --- | --- | --- |
+| `GET /v1/home/rooms` | device (owner on loopback) | `?limit=&after=` → `{"configured": bool, "reason"?, "rooms": [{"id","name","count"}], "next_after"}`. Always answers 200 with `configured` and, when it is false, a `reason`: `no_url`, `bad_url`, `no_token`, `bad_token`, `no_allowlist`, `bad_allowlist`, `no_rooms`. Home Assistant is not contacted when unconfigured. |
+| `GET /v1/home/rooms/{room_id}/devices` | device (owner on loopback) | `?limit=&after=` → `{"room", "devices": [{"entity_id","label","state","impactful","actions"}], "next_after"}`, at most 8 per page. Only entities in the owner's allowlist file (`OYSTER_HOME_ALLOWLIST`, example `examples/home_allowlist.example.json`) can be read or controlled. |
+| `POST /v1/home/actions` | **device token only** | `{"entity_id","action","confirmed"?}` with an `Idempotency-Key` header (required) → `{"entity_id","action","result":"ok","state","duplicate"}`. Locks, covers and alarm panels are always impactful and need `confirmed: true`, sent only after a key press on the device (alarm panels can only be armed). The owner token is refused. |
+| `GET /v1/home/status` | owner (loopback only) | What is configured (`url_set`, `token_set`, `tls`, `ca_file_set`) and the allowlist problems; never the URL or the token. |
+| `GET /v1/home/audit` | owner (loopback only) | Append-only audit, newest first, at most 50 per page; a `pending` row is written before each Home Assistant call. |
+
+`HOME_ASSISTANT_URL` and `HOME_ASSISTANT_TOKEN` (and optionally `HOME_ASSISTANT_CA`) are read from `backend/.env`; they are never returned by any route, never logged and never sent to the device. Limits: 20 actions and 60 reads per minute per device (**429** `rate_limited`). Home Assistant is not configured on the current setup, and the bridge has been tested only against a fake Home Assistant.
+
+Error codes of these routes, in the usual `{"error","detail"}` body: `home_not_configured` (503), `home_unreachable` (503), `home_timeout` (503; on an action the outcome is unknown), `home_auth_failed` (502), `home_refused` (502), `home_upstream_error` (502), `confirmation_required` (409, nothing was sent), `action_not_allowed` (403), `idempotency_conflict` and `request_in_progress` (409), `audit_unavailable` (503, nothing was done), plus `not_found`, `validation_failed`, `payload_too_large` and `rate_limited` as elsewhere.
 
 Errors are `{"error": "<code>", "detail": "<text>"}` with codes such as `unauthorized`, `forbidden`, `not_found`, `conflict`, `events_missing`, `validation_failed`, `stale_scope`, `payload_too_large`, `rate_limited` (**429**, with `Retry-After`: auth throttling or run admission limits). Request bodies are capped (4 KiB device, 16 KiB owner) whether or not a `Content-Length` is sent.
 

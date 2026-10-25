@@ -11,7 +11,7 @@
     -Script FILE [-Out DIR]  replay a key script (see simulator\examples\navigation.keys.txt); shots go to DIR
     -Test                 run the simulator tests (tests\simulator)
     -Routes / -Keys       print the route table / the key table as Markdown
-    -Preview              mock screens for the modules the firmware does not have (Linux, Control Deck, Smart Home)
+    -Preview              also shows the Original Apps tile, which the default firmware build does not offer
   Layout, geometry and colours follow the firmware; the glyph bitmaps are extracted from the pinned M5GFX source.
   Exact pixel parity with the real display is UNVERIFIED until compared with photos taken on a device.
 

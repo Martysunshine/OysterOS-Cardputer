@@ -29,7 +29,10 @@ not happened yet** (no Cardputer attached).
 
 > **Note:** IRremote comes in through M5Cardputer's floating `*` dependency, so it is pinned explicitly in
 > `lib_deps` to keep the installed package set reproducible. In a build on 2026-10-24 it was installed but did
-> **not** appear in the dependency graph (LDF chain mode), so it did not end up in that binary.
+> **not** appear in the dependency graph (LDF chain mode), so it did not end up in that binary. Since the Smart
+> Home module (`firmware/src/modules/ir_remote.cpp`, the only file that includes it, with the receiver code
+> compiled out) it is used and appears in the link map of the module build. ArduinoJson is also used by the
+> firmware now: the response parsers of the Hosts, Control Deck and Smart Home modules.
 
 Board and build settings (`firmware/platformio.ini`):
 
@@ -67,8 +70,8 @@ Single factory app, no OTA (v1). The bootloader sits at `0x0` and the partition 
 
 | Name | Type / subtype | Offset | Size | Use |
 | --- | --- | --- | --- | --- |
-| `nvs` | data / nvs | `0x9000` | `0x6000` (24 KiB) | settings, device token, Wi-Fi credentials, bonds |
-| `phy_init` | data / phy | `0xF000` | `0x1000` (4 KiB) | RF calibration |
+| `nvs` | data / nvs | `0x9000` | `0x5000` (20 KiB) | settings, device token, Wi-Fi credentials, bonds |
+| `otadata` | data / ota | `0xE000` | `0x2000` (8 KiB) | written by every upload (`boot_app0.bin`); selects nothing without OTA slots |
 | `factory` | app / factory | `0x10000` | `0x500000` (5 MiB) | the firmware image |
 | `spiffs` | data / spiffs | `0x510000` | `0x2E0000` (2944 KiB) | LittleFS: backend CA (`/ca/backend_ca.pem`) |
 | `coredump` | data / coredump | `0x7F0000` | `0x10000` (64 KiB) | crash dumps |
@@ -77,17 +80,23 @@ End of the last partition: `0x800000` = 8 MiB.
 
 ## Binary size
 
-Measured in a clean build of `env:cardputer-adv` on a Windows host on 2026-10-25 (PlatformIO 6.2.0, no compiler
+Measured in clean builds of `env:cardputer-adv` on a Windows host on 2026-10-25 (PlatformIO 6.2.0, no compiler
 warnings). These are **build measurements, not hardware results**: nothing has run on a device.
 
-| Item | Value |
+With the Hosts, Control Deck and Smart Home modules (and the module framework) the firmware is **about** 33.2 % of the
+5 MiB factory partition (flash) and **about** 42.6 % static RAM. The module state is static: about 5.8 KB of `.bss`
+for Hosts, about 4.7 KB for the Control Deck and about 3.0 KB for Smart Home. The detailed rows below are from the
+earlier clean build, before those modules; run `scripts/firmware-build.ps1` for the exact current numbers and hash.
+
+| Item (earlier clean build, before the modules) | Value |
 | --- | --- |
 | `firmware.bin` size | 1673616 bytes |
 | Share of the 5 MiB factory partition | 31.9% (1,673,257 bytes of 5,242,880 reported by PlatformIO) |
 | Static RAM (`.data` + `.bss`) | 38.1%: 124,952 of 327,680 bytes |
 | Heap left at boot, minimum free heap, largest free block | **Not measured.** The project goals (>= 64 KiB / >= 32 KiB) are checked from the on-device telemetry; see HARDWARE_VERIFICATION.md |
-| `firmware.bin` SHA-256 | `edf4f78fbbff17b1c8298b79a01fd6fc9eefb07a3187020dc9d804ec402f36a9` |
-| Host tests (`pio test -e native`) | 173 cases pass (core logic, delivery/ledger rules, identity, paging, input mapping incl. Home/Help) |
+| `firmware.bin` SHA-256 (of that earlier build; the module build has another) | `edf4f78fbbff17b1c8298b79a01fd6fc9eefb07a3187020dc9d804ec402f36a9` |
+| Host tests (`pio test -e native`) | 173 cases pass in the core and input suites (core logic, delivery/ledger rules, identity, paging, input mapping incl. Home/Help); the modules add their own suites: `test_hosts` 28 cases, `test_deck` 35, `test_smarthome` 24 |
+| Backend and tool tests (`pytest tests`) | 1958 passed, 3 skipped at the time of writing; among them `tests/deck` 486, `tests/home` 170 and `tests/simulator` 165 |
 
 The SHA-256 changes with any source change; `scripts/firmware-build.ps1` prints the current one.
 The assessment worker task uses a 16 KiB stack (its TLS handshake shares it; the 9.5 KB discovery result no longer lives on it:

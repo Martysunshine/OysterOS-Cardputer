@@ -23,9 +23,9 @@ Home [H01]  (2-column tile grid, numbers as in the H01 wireframe)
 │   ├── Enrolled Targets ── Detail ── Assess
 │   └── Assess (authorized GATT) ── GATT results ── Detail / Last read
 ├── 2 Oyster AI [A10] ── Ask (text entry) ── Run [A11 / A12]
-├── 3 Linux        -> "not available in this build" [L10]
-├── 4 Control Deck -> "not available in this build" [D10]
-├── 5 Smart Home   -> "not available in this build" [SH10]
+├── 3 Linux (Hosts)  -> Module (Hosts) [L10] ── Overview [L11] ── Services [L12]; `l`: Logs page [L13]
+├── 4 Control Deck   -> Module (Deck) [D10] ── Slots [D11] ── Confirm [D20] ── Result [D21]; History [D22]
+├── 5 Smart Home     -> Module (SmartHome) [SH10] ── Devices [SH11] ── Commands [SH12]
 ├── 6 Original Apps-> "not available in this build" [O10]
 ├── 7 Settings [P10] ── Backend, Brightness, Storage, Diagnostics, Sync, New session,
 │                       Keyboard, Key tester [P11], About
@@ -36,6 +36,25 @@ Differences from the design navigation: Home has two extra tiles (7 Settings, 8 
 scrolls into view, because the design reaches Settings from Home and the Help key is not yet verified (the
 tile is a visible fallback). Targets and Assess are Oyster Pocket screens for authorized BLE checks; they sit
 under Security, next to the design's Wi-Fi / BLE / Findings entries.
+
+## Module pages (Home tiles 3 to 6)
+
+Tiles 3 to 6 open `Screen::Module`: one screen whose content is the current page of a module
+(`firmware/include/modules.h`, `firmware/src/modules/modules.cpp`). A page is a **List** (5 rows of at most 28
+characters), a scrolling **Text**, or a **Confirm** page (operation, target, effect). Enter calls the module's
+select handler, Back goes up one page (or rejects a confirmation), and the action strip shows `Key:Action` pairs
+of at most 28 characters. Network calls run on the worker task (`RequestKind::Module`, through the generic
+`BackendClient::call`), so the UI never waits for the network; a page shows `working` while a call runs. A
+Confirm page ignores keys for the first 700 ms and is rejected by Back, Home and the emergency cancel. Each
+module also reports a short status for its Home tile.
+
+| Module | Source | Home tile text | Extra keys |
+|---|---|---|---|
+| Hosts (tile 3, "Linux") | `firmware/src/modules/hosts.cpp`, parsers `oyster_core/hosts_json.*` | `N hosts`, `no hosts`, `offline` | `r` refresh, `l` logs page |
+| Control Deck (tile 4) | `firmware/src/modules/deck.cpp`, parsers `oyster_core/deck_json.*` | `N profiles`, `no profile`, `offline` | `r` reload, `1`-`9` run a slot |
+| Smart Home (tile 5) | `firmware/src/modules/smart_home.cpp`, `ir_remote.cpp`, `oyster_core/ir_codes.*`, `oyster_core/home_json.*` | `IR+HA`, `IR only`, `offline` | `r` refresh, `1`-`6` send an IR key or run an action |
+
+The first three modules are written, compiled and host-tested, and **none has run on a Cardputer ADV**.
 
 ## Screen table
 
@@ -55,9 +74,15 @@ under Security, next to the design's Wi-Fi / BLE / Findings entries.
 | A11 | AI working | `RunView` | `g_backend.latest_run()` status | implemented |
 | A12 | AI answer | `RunView` (scrolling pages, line counter in the footer) | `g_backend.latest_run().answer_excerpt` | implemented |
 | (dialog) | Confirmation of a backend job | `ConfirmDialog` (modal) | `g_runner.pending_confirmation()`, bound to job id + nonce | implemented (700 ms key guard; Back, Home and Cancel reject) |
-| L10-L13 | Linux host selection, overview, services, logs | `Unavailable` (Linux) | none | unavailable on the device: the backend has read-only host health with mock adapters ([`COMPANION_API.md`](COMPANION_API.md)), no firmware client |
-| D10, D11, D20-D22 | Control Deck profile, macro, confirm, running, history | `Unavailable` (Control Deck) | none | unavailable on the device: the backend side exists ([`CONTROL_DECK.md`](CONTROL_DECK.md), mock executor), the firmware screens do not |
-| SH10-SH12 | Smart Home rooms, device, IR | `Unavailable` (Smart Home) | none | unavailable: no IR profiles, no Home Assistant |
+| L10 | Linux host selection | `Module` (Hosts), List page | `GET /v1/hosts` via the worker task; `hosts_json` parser | implemented (written, unverified on the device); read-only; Enter opens a host; when the list is empty or the call failed, a text page says why (`No hosts shared with this device`, `offline`, ...) |
+| L11 | Linux host overview | `Module` (Hosts), List page | `GET /v1/hosts/{id}/health` (CPU, memory, disk, uptime, state, age of the reading) | implemented (written, unverified on the device); Enter opens the services list, `r` refreshes, `l` opens the logs page |
+| L12 | Linux services | `Module` (Hosts), List page | the `services` of the same health report | implemented (written, unverified on the device); Enter shows `name: state` as a notice, `No services listed` when none is shared |
+| L13 | Linux logs | `Module` (Hosts), Text page | none (fixed text) | implemented (written, unverified on the device); says plainly that there is no log source, because the backend serves no logs route ([`COMPANION_API.md`](COMPANION_API.md)) |
+| D10, D11 | Control Deck profiles and slots | `Module` (Deck), List pages | `GET /v1/deck/profiles?limit=5` (up to 5 per device page, paged), slots 1-9 from the profile; `*` after the number marks an impactful slot | implemented (written, unverified on the device); number keys `1`-`9` run a slot directly, each key press with a fresh Idempotency-Key and never auto-retried |
+| D20 | Control Deck confirmation | `Module` (Deck), Confirm page | `POST /v1/deck/jobs/{id}/confirm` and `/cancel`; the nonce is bound to the job id and stays in RAM | implemented (written, unverified on the device); only for impactful slots; Enter approves, Back rejects, keys ignored for the first 700 ms, expiry 120 s |
+| D21, D22 | Control Deck result and history | `Module` (Deck), Text and List pages | `GET /v1/deck/jobs/{id}` polled every 1.5 s; `GET /v1/deck/history?limit=10` | implemented (written, unverified on the device); the result page says `Status unknown` when an answer was lost, history shows the last 10 finished jobs ([`CONTROL_DECK.md`](CONTROL_DECK.md)) |
+| SH10 | Smart Home rooms | `Module` (SmartHome), List page | `IR Remote` first (no backend), then `GET /v1/home/rooms` | implemented (written, unverified on the device); one muted status row when Home Assistant is not set up, loading or offline |
+| SH11, SH12 | Smart Home devices and commands | `Module` (SmartHome), List pages and Confirm page | IR: five TV families on the IR LED (GPIO44, an assumption); Home Assistant: `GET /v1/home/rooms/{id}/devices`, `POST /v1/home/actions` | implemented (written, unverified on the device); IR sends Power, Vol+, Vol-, Mute, Ch+, Ch- and says `Sent`, never `done`; locks, covers and alarm panels ask first ([`HOME_ASSISTANT.md`](HOME_ASSISTANT.md)) |
 | O10 | Original Apps entry | `Unavailable` (Original Apps) | none | unavailable: no verified launcher integration |
 | P10 | Settings | `Settings` | `backend_short()`, brightness, `g_board.storage()` | implemented |
 | P11 | Key diagnostics | `KeyTest` | raw `KeySnapshot` from `g_board.read_keys()` and the resolved `NavEvent`s | implemented (needs the device to be useful) |
@@ -84,7 +109,8 @@ action so they can be confirmed and recorded in [Hardware verification](HARDWARE
 | Home | `Fn`+`Del` (press `Fn` first), any mode | clears the stack to Home; a confirm dialog is rejected first (after its key guard) |
 | Help | `?` (`Shift`+`/`), navigation mode | opens Help for the current screen; not over the confirm dialog or in text entry |
 | Cancel | `Fn`+`` ` `` or `Ctrl`+`C`, any mode | cancels the running task on every screen, rejects an open confirmation |
-| Shortcuts | `1`-`8` on Home only (advertised in the footer) | open a tile |
+| Shortcuts | `1`-`8` on Home (advertised in the footer) | open a tile |
+| Module keys | `r` refresh or reload (Hosts, Control Deck, Smart Home), `l` logs page (Hosts), `1`-`9` run a slot (Control Deck slots), `1`-`6` send an IR key or run an action (Smart Home commands) | only on the module page that offers them; the action strip shows them |
 
 Key tester exception: there every action is only displayed; Back or Home pressed twice within 2 s leaves,
 Cancel still works.
@@ -99,9 +125,9 @@ Cancel still works.
 | Text editor handles Backspace and Cancel | implemented (`Del` erases, `Del` on empty leaves, Cancel / Home leave) |
 | All jobs have a failure state | implemented for the existing operations (outcome toast, Evidence, Run view) |
 | Connected labels derive from actual connectivity | implemented (status banner, connection dot, Oyster AI tile from the backend state) |
-| No fake functional toggles | implemented (unavailable modules open an explanation, nothing else) |
+| No fake functional toggles | implemented (Original Apps opens an explanation, nothing else; the Hosts, Control Deck and Smart Home pages act only through typed backend calls or the IR LED, ask before impactful actions, and report `Sent` or the failure instead of a made-up success) |
 | Long SSIDs / BLE names are safely clipped | implemented (`~` marks clipping; the detail view shows the full value) |
 | Zero-scan results handled | implemented (empty-state text per list) |
-| Clearly disabled state for unfinished modules | implemented (muted label, dimmed icon, "unavailable") |
+| Clearly disabled state for unfinished modules | implemented (a module that reports itself unavailable gets a muted label, a dimmed icon and a message with the reason; Original Apps is the one that is unavailable in this build) |
 | Legibility of fonts and colours | needs hardware (photographs) |
 | Physical key bindings | needs hardware (key tester) |

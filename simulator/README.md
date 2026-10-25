@@ -18,7 +18,7 @@ Requirements: Python 3.12+, [Pillow](https://pypi.org/project/Pillow/) (`require
 
 ```powershell
 .\scripts\ui-sim.ps1                                   # interactive window, scale 4
-.\scripts\ui-sim.ps1 -Preview                          # + mock screens for Linux / Control Deck / Smart Home
+.\scripts\ui-sim.ps1 -Preview                          # + the Original Apps tile (the other module screens are in both profiles)
 .\scripts\ui-sim.ps1 -Headless -Out .\out\ui           # every route x state as PNG + contact sheets
 .\scripts\ui-sim.ps1 -Script .\simulator\examples\navigation.keys.txt -Out .\out\nav
 .\scripts\ui-sim.ps1 -Test                             # tests\simulator

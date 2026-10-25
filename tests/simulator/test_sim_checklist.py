@@ -307,7 +307,9 @@ def test_a_device_without_state_has_nothing_to_toggle(preview):
 
 
 def test_unavailable_modules_have_no_controls_in_the_firmware_profile(sim):
-    for key in ("3", "4", "5", "6"):
+    # Original Apps (6) is the one module that is unavailable in this build; Hosts, Control Deck and Smart
+    # Home are implemented in the firmware (unverified on a device) and run on mock data in the simulator.
+    for key in ("6",):
         sim.press(key)
         assert "Not available in this build" in screen_text(sim).replace(
             "\n", " "
@@ -456,20 +458,30 @@ def test_sorting_the_results_changes_the_order_and_restarts_at_the_top(sim):
 
 def test_selecting_an_unfinished_module_explains_it_and_back_returns_home(sim):
     th = theme()
-    sim.press("3")
-    assert sim.cur == "L10"
+    sim.press("6")
+    assert sim.cur == "O10"
     text = screen_text(sim)
-    assert "Linux: unavailable" in text and "Not available in this build." in text
+    assert "Original Apps: unavailable" in text and "Not available in this build." in text
     sim.render()
     assert pixel(sim, 0, th.HeadingY) == th.SurfaceBase.rgb888  # an explanation, not an error alert
     sim.press("`")
     assert sim.cur == "H01"
 
 
-def test_unfinished_modules_become_screens_only_in_the_preview_profile(preview):
-    preview.press("4")
-    assert preview.cur == "D10" and "CONTROL DECK" in screen_text(preview)
-    assert "SIMULATED" in preview.ui.log.status
+def test_hosts_deck_and_smart_home_are_screens_in_both_profiles_drawn_from_labelled_mock_data(sim, preview):
+    for s in (sim, preview):
+        for key, route, heading in (
+            ("3", "L10", "Linux"),
+            ("4", "D10", "CONTROL DECK"),
+            ("5", "SH10", "Rooms"),
+        ):
+            s.press(key)
+            assert s.cur == route and s.view().state == "normal", (key, route)
+            text = screen_text(s)
+            assert heading in text and "unavailable" not in text.lower(), route
+            assert "SIMULATED" in s.ui.log.status  # mock data, never presented as backend data
+            s.press("`")
+            assert s.cur == "H01"
 
 
 # ---- connectivity-dependent views (NET-01, AI) ------------------------------------------------------------

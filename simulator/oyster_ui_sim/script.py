@@ -1,6 +1,6 @@
 """Key-sequence replay (`--script keys.txt`): one command per line, '#' starts a comment.
 
-profile firmware|preview     fresh simulator (preview = mock screens for modules the firmware lacks)
+profile firmware|preview     fresh simulator (preview = also enables the Original Apps tile)
 conn offline|connect|online|no-clock|cert-err|auth-err|init-err
 scan normal|zero             what simulated scans find
 fault ble                    the BLE module "did not start"

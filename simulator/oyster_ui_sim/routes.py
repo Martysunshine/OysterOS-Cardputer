@@ -2,8 +2,10 @@
 that sit next to them, as data. Each route names its parent (Back), the targets of Enter, the Help target and
 which module it belongs to; Home always goes to H01. `availability` mirrors docs/UI_SCREEN_MAP.md:
 "implemented" screens exist in the firmware, "unavailable" ones open the "Not available in this build"
-screen there and are only
-drawn as a mock-data preview when the simulator runs with preview=True."""
+screen there and are only drawn as a mock-data preview when the simulator runs with preview=True.
+The Linux (Hosts), Control Deck and Smart Home screens are implemented in the firmware but unverified on a
+device; the simulator draws them from built-in mock data in both profiles (labelled SIMULATED), not from the
+backend. Original Apps (O10) is the one unavailable module."""
 
 from __future__ import annotations
 
@@ -218,7 +220,6 @@ ROUTES: tuple[Route, ...] = (
         "H01",
         "list",
         "linux",
-        UNAVAILABLE,
         enter=(("host", "L11"),),
         empty="No hosts known",
         error="The companion is offline: host list not available.",
@@ -229,7 +230,6 @@ ROUTES: tuple[Route, ...] = (
         "L10",
         "list",
         "linux",
-        UNAVAILABLE,
         enter=(("health", "msg"), ("services", "L12"), ("logs", "L13")),
         empty="No data from this host",
         error="The host did not answer.",
@@ -240,7 +240,6 @@ ROUTES: tuple[Route, ...] = (
         "L11",
         "list",
         "linux",
-        UNAVAILABLE,
         enter=(("detail", "msg"),),
         empty="No services reported",
         error="The service list could not be read.",
@@ -251,7 +250,6 @@ ROUTES: tuple[Route, ...] = (
         "L11",
         "message",
         "linux",
-        UNAVAILABLE,
         empty="No log lines",
         error="The log could not be read.",
     ),
@@ -262,7 +260,6 @@ ROUTES: tuple[Route, ...] = (
         "H01",
         "list",
         "deck",
-        UNAVAILABLE,
         enter=(("macro", "D11"), ("history", "D22")),
         shortcuts="1234",
         empty="This profile has no macros",
@@ -274,7 +271,6 @@ ROUTES: tuple[Route, ...] = (
         "D10",
         "message",
         "deck",
-        UNAVAILABLE,
         enter=(("confirm", "D20"), ("run", "D21")),
         error="The macro summary could not be loaded.",
     ),
@@ -284,13 +280,12 @@ ROUTES: tuple[Route, ...] = (
         "D11",
         "confirm",
         "deck",
-        UNAVAILABLE,
         modal=True,
         error="The confirmation expired. Nothing was run.",
         empty="Nothing to confirm.",
     ),
-    _r("D21", "Job", "D11", "progress", "deck", UNAVAILABLE, job="deck", empty="No job"),
-    _r("D22", "Job history", "D10", "list", "deck", UNAVAILABLE, empty="No jobs yet"),
+    _r("D21", "Job", "D11", "progress", "deck", job="deck", empty="No job"),
+    _r("D22", "Job history", "D10", "list", "deck", empty="No jobs yet"),
     # ---- Smart Home -------------------------------------------------------------------------------------
     _r(
         "SH10",
@@ -298,7 +293,6 @@ ROUTES: tuple[Route, ...] = (
         "H01",
         "list",
         "smart",
-        UNAVAILABLE,
         enter=(("room", "SH11"),),
         empty="No rooms",
         error="The home integration is not connected.",
@@ -309,7 +303,6 @@ ROUTES: tuple[Route, ...] = (
         "SH10",
         "list",
         "smart",
-        UNAVAILABLE,
         enter=(("ir", "SH12"),),
         empty="No devices in this room",
         error="Device state could not be read.",
@@ -320,7 +313,6 @@ ROUTES: tuple[Route, ...] = (
         "SH11",
         "list",
         "smart",
-        UNAVAILABLE,
         job="ir",
         empty="No IR profile set up",
         error="The IR transmitter reported an error.",
@@ -407,8 +399,9 @@ DESIGN_IDS: tuple[str, ...] = (
     "P11",
 )
 
-# The module of Home that opens each module-entry route, and its "Not available in this build" text
-# (firmware/src/app_controller.cpp, kUnavailable).
+# The "Not available in this build" text of the modules the firmware does not implement
+# (firmware/src/app_controller.cpp, kUnavailable). Only Original Apps is still unavailable; the Linux,
+# Control Deck and Smart Home entries mirror the firmware table and are not shown (see views.unavailable).
 UNAVAILABLE_TEXT: dict[str, tuple[str, str]] = {
     "linux": (
         "Linux: unavailable",
