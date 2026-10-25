@@ -1,21 +1,29 @@
 # Smart Control Deck (Issue #4)
 
-Backend module for macro profiles with slots 1-9, confirmation of impactful actions, an idempotent job state
-machine, an audit trail and history. Code: `backend/oyster/deck/`. Tests: `tests/deck/`.
+Macro pad for the owner's own PC: profiles with slots 1-9, typed allowlisted actions, confirmation of
+impactful actions on the Cardputer, an idempotent job state machine, an audit trail and history. Code:
+`backend/oyster/deck/` (backend), `firmware/src/modules/deck.cpp` and
+`firmware/lib/oyster_core/{include/oyster_core/deck_json.h,src/deck_json.cpp}` (device). Tests: `tests/deck/`,
+`firmware/test/test_deck/`.
 
 ## Status, stated plainly
 
-- **Mock executor only.** The only executor that ships is `MockExecutor`: it records the typed action it was
-  given and executes **nothing on any host**. Every job carries `"executor": "mock"` and every mock step
-  summary says "nothing was executed on any host". The module proves the control path (allowlist,
-  confirmation, idempotency, state machine, audit, authorization); it does not prove that a service was
-  restarted or a machine woken. A real executor is future work (see "Executor contract").
-- **Not verified on hardware.** The Control Deck screens D10, D11, D20, D21 and D22 are **not implemented in
-  the firmware** (the Home tile still shows "not available in this build", see `docs/UI_SCREEN_MAP.md`). The
-  device-side flow is meant to be shown by the host simulator (Issue #2) against this API; nothing here has
-  run on a Cardputer.
+- **Two executors.** `MockExecutor` is the default: it records the typed action and executes **nothing on any
+  host** (jobs carry `"executor": "mock"`, the device says "Mock executor: nothing was run on the PC").
+  `WindowsExecutor` (`executor_windows.py` with the OS layer `os_windows.py`) acts on the machine the backend
+  runs on; jobs carry `"executor": "windows"`. It is selected with `OYSTER_DECK_EXECUTOR=windows` (see
+  "Configuration"); without that setting, and in every test run, nothing is executed.
+- **Verified on the real PC, read-only parts only.** On one Windows 11 machine (not elevated) the real OS layer
+  was constructed and asked for host health, the state of two real services and a missing one, the elevation
+  state, and a restart of a service name that does not exist (answers "service not found" and touches
+  nothing). **Not verified on a real session:** the media-key presses, the workstation lock, Wake-on-LAN
+  packets and service restarts. Those are covered by unit tests against a fake OS layer only
+  (`tests/deck/test_deck_executor_windows.py`); treat them as unverified until they have been run on the PC.
+- **Firmware built, not verified on hardware.** The Control Deck module (screens D10, D11, D20, D21, D22) is
+  implemented in the firmware and compiles; its parsers and texts are host-tested. It has **not run on a
+  Cardputer** and has not talked to a real backend.
 - **Wiring.** The module is self-contained. It becomes part of the backend with one call, `install(app)`
-  (see "Wiring"); until that call is made in `oyster.main.create_app` the routes are not served.
+  (see "Wiring").
 
 ## Wiring
 
@@ -37,6 +45,23 @@ install(app)   # after errors.install(app); idempotent
   `app.state.deck.stop()`. `install(app, runtime)` takes an explicit
   runtime, which is how the tests inject a clock, an executor and deterministic ids.
 - Opening the runtime settles jobs a previous process left behind (see "Crash and restart").
+- The executor of the shared runtime comes from the environment (`mount.executor_from_env`, see
+  "Configuration"). An unknown `OYSTER_DECK_EXECUTOR` or an invalid setting stops start-up with a clear error
+  (values are never echoed) instead of silently running with the mock. A pytest run never builds the real
+  Windows layer on its own, even if the owner's `backend/.env` selects `windows`.
+
+## Configuration
+
+Read from the process environment (`backend/.env` is loaded into it by `load_settings`). Nothing is read from
+a request, a profile or a job.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `OYSTER_DECK_EXECUTOR` | `mock` | `mock` records and executes nothing; `windows` acts on this PC. |
+| `OYSTER_DECK_LOCAL_HOST_ID` | `this-pc` | The one host id that means "this PC". Every other host id is refused (except Wake-on-LAN targets). Same pattern as a profile host id. |
+| `OYSTER_DECK_WOL_HOSTS` | empty | `host_id=MAC;host_id=MAC`: the only source of Wake-on-LAN targets. A host not listed here cannot be woken. |
+| `OYSTER_DECK_WOL_BROADCAST` | `255.255.255.255` | IPv4 broadcast address the magic packet is sent to (UDP port 9). |
+| `OYSTER_DECK_RESTART_SERVICES` | empty | Comma-separated Windows service names the executor may restart, in addition to the profile's own `hosts[...].services`. Empty means no restart is ever attempted. |
 
 ## Model
 
@@ -51,15 +76,21 @@ Typed pydantic models (`extra="forbid"`, name-pattern-bounded strings), tagged b
 | `service_status` | `host_id`, `service` | no | 15 s |
 | `wake_on_lan` | `host_id` | **yes** | 15 s |
 | `service_restart` | `host_id`, `service` | **yes** | 60 s |
+| `media_key` | `host_id`, `key` (`play_pause`, `next`, `prev`, `vol_up`, `vol_down`, `mute`) | no | 10 s |
+| `lock_workstation` | `host_id` | **yes** | 15 s |
 
 - `impactful` is a **class constant**, not a field. A request, a profile, a stored row or a server flag cannot
   set or lower it; a field named `impactful` is rejected like any other unknown field (ADR-005).
 - Unknown action types are rejected when a profile is defined (422 `action_not_allowed`), again when a slot
   runs (409 `action_not_allowed`, no job is created) and a third time by the runner right before execution
   (job `failed`, reason `action_not_allowed`).
-- There is no field that carries a command, a script, a path, a URL or an argument list. Host ids and service
-  names are validated **names** (`[0-9a-zA-Z_-]{1,40}` and `[A-Za-z0-9][A-Za-z0-9_.@-]{0,63}`); the executor
-  resolves them through its own registry.
+- There is no field that carries a command, a script, a path, a URL, an address or an argument list. Host ids
+  and service names are validated **names** (`[0-9a-zA-Z_-]{1,40}` and `[A-Za-z0-9][A-Za-z0-9_.@-]{0,63}`); the
+  executor resolves them through its own registry. `key` is a closed set of six names; a Wake-on-LAN MAC
+  address is not an action field at all (it comes from `OYSTER_DECK_WOL_HOSTS`).
+- Media keys go through the system media keys, so any player that listens to them reacts (a music player, a browser
+  tab, a video player); there is no OAuth and no player API. Which player answers is Windows' choice, and the
+  job result only says the key was sent.
 
 ### Profiles (`profiles.py`)
 
@@ -153,6 +184,19 @@ checks the host and starts a new run with a new key.
 
 Confirmation requirements come only from the action types in the slot. No stored or supplied flag lowers them.
 
+| Action | Confirmation on the Cardputer | Why |
+| --- | --- | --- |
+| `noop`, `host_health_check`, `service_status` | no | read-only |
+| `media_key` | no | changes playback or volume only; no session state, repeatable by pressing again |
+| `lock_workstation` | **yes** | ends the user's interactive session |
+| `wake_on_lan` | **yes** | powers a machine on |
+| `service_restart` | **yes** | interrupts a service |
+
+A slot with several actions asks once if any of them asks. On the device the confirmation page names the slot
+label, the target host (`this-pc` is shown as "this PC") and what the impactful steps do (built from the job's
+step types, hosts and services, never from free text); read-only steps of the same slot are not part of the
+question.
+
 ## API
 
 Errors are `{"error": "<code>", "detail": "<text>"}` as in `docs/API.md`: 401 missing or invalid token, 403
@@ -187,6 +231,42 @@ Step `outcome` is `pending`, `succeeded`, `failed`, `unknown` or `skipped` (afte
 job). Step `summary` is at most 120 printable ASCII characters from the executor and must be redacted by it.
 Device responses are bounded by construction (at most 3 steps) and stay under 4 KiB; the default history page
 (10 entries) does too; a page of 50 does not, so a device should ask for what its screen needs.
+
+## Device flow (Cardputer, `firmware/src/modules/deck.cpp`)
+
+Home tile 4. The module draws one page at a time through the module framework (`firmware/include/modules.h`);
+network work runs on the worker task, the UI never blocks. Not run on a real device yet.
+
+| Page | Screen | Content and keys |
+| --- | --- | --- |
+| Profiles | D10 | Rows: the profiles bound to this device (`GET /v1/deck/profiles?limit=5`, `next_after` paging with "More profiles..." and "Previous profiles" rows), then "History". Enter opens, `r` reloads. A reserved spot for a later "Claude Code" row is marked by a comment in `row_kind()`; nothing is offered for it. |
+| Slots | D11 | `1  Label` per slot, `*` after the number marks an impactful slot (it asks first). Keys `1`-`9` or Enter run the slot at once. |
+| Working | | "Sending to the backend...". Back stops waiting (the action may still run: see History). |
+| Confirm | D20 | Operation = slot label, target = host (`this-pc` shown as "this PC"), effect = what the impactful steps do. Enter approves, Back or the emergency cancel rejects, running out of the window (the backend's 120 s minus 3 s) rejects. The UI ignores keys for the first 700 ms. |
+| Result | D21 | Polls `GET /v1/deck/jobs/{id}` every 1.5 s until the job ends (at most about 2.5 minutes), then shows state, each step with its summary, the reason and, for the mock, "Mock executor: nothing was run on the PC." |
+| History | D22 | `GET /v1/deck/history?limit=10`, finished entries only (the queued, running and awaiting rows of a job are dropped), newest first. Enter opens the job in the Result page. |
+
+Rules the device follows:
+
+- **One Idempotency-Key per key press**, `dk-` plus 24 hex digits from the hardware random generator and the
+  millisecond clock. The run request is sent with `idempotent=false` (the client never resends it by itself).
+  The key is kept only to repeat the **same** press: if the answer was lost, the Result page says "Status
+  unknown" and Enter sends the same request with the same key, which returns the job the backend already has
+  or creates it once. A new key press always gets a new key.
+- **The nonce** returned for this device stays in module RAM, is never displayed or logged, goes only into the
+  confirm body together with the job id, and is wiped when used, rejected or left behind.
+- **Approving** sends `POST /v1/deck/jobs/{id}/confirm` once (not retried). **Rejecting** sends
+  `POST /v1/deck/jobs/{id}/cancel`. If the device is left with Home while a confirmation is open, the job is
+  not answered by the device; it expires on the backend after its window, and the next time the module is
+  opened the leftover confirmation is cancelled.
+- **Texts** (all plain, no hang): backend offline or not set up ("Nothing was sent"), device clock not set,
+  rejected device token (401/403), not found (404), conflicts by code (`expired`: "The confirmation window
+  closed. Nothing ran.", `already_decided`, `not_cancellable`, `conflict`), rejected request (413/422), rate limit
+  (429, "Wait N s"), backend busy (503), other server errors. `unknown_outcome` says the action may have run and
+  is never retried. A reply the device cannot parse is rejected whole, not shown in part.
+- **Home tile**: "N profiles" / "no profile" / "offline"; "checking..." until the first answer and "error" when
+  the backend refused the list. The tile fetches the first page once in the background when Home is drawn, and
+  retries on a later look at Home only after 30 s and only if that failed.
 
 ## Audit and history (`audit.py`)
 
@@ -227,12 +307,69 @@ failed action stops the job and the rest are `skipped`. Outcomes:
 
 Nothing is retried. Exception messages from the executor are dropped (they may carry host details).
 
+### The Windows executor (`executor_windows.py`, `os_windows.py`)
+
+`WindowsExecutor` implements `ActionExecutor` (`kind = "windows"`) on top of an `OsLayer` protocol that holds
+**all** operating-system access; `WindowsOsLayer` (Win32 through `ctypes`, `psutil`, one UDP socket) is the only
+module of the package that touches the OS, and the test `test_only_the_os_layer_uses_ctypes` keeps it that way.
+There is no shell, no child process, no code evaluation and no path or command taken from a request.
+
+| Action | What happens | Results |
+| --- | --- | --- |
+| `noop` | nothing | `ok` |
+| `host_health_check` | CPU, memory and system-drive percentages (psutil) | `ok`, summary `cpu 12% mem 63% disk 71%` |
+| `service_status` | state of one Windows service (psutil) | `ok` with `Name: running`; `service_not_found`; `access_denied` |
+| `media_key` | presses and releases one media key with `SendInput` | `ok` ("key sent; player reaction not checked"); `input_blocked` |
+| `lock_workstation` | `LockWorkStation()` | `ok` ("lock request accepted by Windows"); `lock_failed` |
+| `wake_on_lan` | one magic packet to the broadcast address, MAC from `OYSTER_DECK_WOL_HOSTS` | `ok` ("magic packet sent; wake-up not verified"); `host_not_allowed`; `wol_send_failed` |
+| `service_restart` | stop, wait, start, wait (20 s each) through the service control manager | `ok`; `service_not_allowed`; `needs_admin`; `restart_incomplete`; unknown outcome when a state is not reached in time |
+
+Rules:
+
+- **One host.** Everything except Wake-on-LAN is refused with `host_not_local` ("refused: this executor only
+  controls this PC") unless `host_id` equals `OYSTER_DECK_LOCAL_HOST_ID`. Nothing is sent to another machine.
+- **Wake-on-LAN.** The MAC address is looked up by `host_id` in `OYSTER_DECK_WOL_HOSTS`; an unlisted host is
+  refused with `host_not_allowed`. The action model has no address field, so a request cannot carry one.
+- **Service restart** needs three things: the service listed in the profile (validated at definition and at
+  run), the service listed in `OYSTER_DECK_RESTART_SERVICES` (empty by default: nothing can be restarted), and
+  an already elevated backend process. Without administrator rights the job ends `failed` with
+  `needs_admin` and the step summary "needs administrator rights; nothing was restarted". The executor never
+  asks for elevation (no UAC prompt, no `runas`); to allow restarts, start the backend elevated yourself.
+- **Honest results.** A refusal or a failure with a known effect is `ok=False` (job `failed`, nothing
+  happened). A result that cannot be told (a service state not reached in time, the OS layer raising
+  `ActionOutcomeUnknown` or anything unexpected) propagates, so the runner ends an impactful job
+  `unknown_outcome`; a non-impactful one `failed`. Exception text is dropped by the runner.
+- **Rights.** It runs with the rights of the account that started the backend, which must be the interactive
+  user's session for media keys and the lock to reach the desktop. A backend started as a Windows service or
+  in another session cannot press keys on your desktop; `SendInput` then reports `input_blocked`.
+- **Volume** moves one Windows step per key press (about 2 %): press the slot repeatedly.
+
+### Seed profile (`seed.py`)
+
+`ensure_desk_profile(runtime_or_service, device_ids, local_host_id="this-pc")` defines the profile `desk`
+("Desk") through the normal service path, so validation and audit apply, and returns `created`, `updated` (the
+content differed: unstarted jobs of the old profile are cancelled) or `unchanged`. Calling it twice changes
+nothing. The slots:
+
+| Slot | Label | Action | Asks first |
+| --- | --- | --- | --- |
+| 1 | PC health | `host_health_check` | no |
+| 2 | Play/Pause | `media_key` `play_pause` | no |
+| 3 | Next | `media_key` `next` | no |
+| 4 | Prev | `media_key` `prev` | no |
+| 5 | Vol+ | `media_key` `vol_up` | no |
+| 6 | Vol- | `media_key` `vol_down` | no |
+| 7 | Mute | `media_key` `mute` | no |
+| 8 | Lock PC | `lock_workstation` | **yes** |
+
+### Contract for any executor
+
 A real executor must: take only the typed models (never a command string or template); use no shell and no
 string interpolation, choosing the host-side operation by action type from a fixed table and passing arguments
 as discrete values; resolve `host_id` and `service` through its own registry and treat them as names, never as
-addresses or paths; enforce the per-action timeout; run as a dedicated unprivileged account limited to the
-listed hosts and services; return at most a short redacted summary; and raise `ActionOutcomeUnknown` whenever it
-cannot tell whether an impactful action took effect.
+addresses or paths; enforce the per-action timeout; use no more rights than the account that started the
+backend (never elevate itself); return at most a short redacted summary; and raise `ActionOutcomeUnknown`
+whenever it cannot tell whether an impactful action took effect.
 
 ## Crash and restart
 
@@ -271,20 +408,33 @@ authorization, audit and history. Only allowlisted typed actions."
 | Failures, timeouts, lost results (M5: "no double run") | `runner.py` | `test_deck_failures.py`: `test_executor_failure_ends_failed_for_both_kinds`, `test_unknown_result_of_an_impactful_action_is_unknown_outcome`, `test_unknown_result_of_a_read_only_action_is_a_plain_failure`, `test_an_unknown_outcome_is_never_retried_automatically`, `test_a_hanging_executor_is_cut_off_by_the_runner_timeout`, `test_the_first_failed_step_stops_the_job_and_later_steps_are_skipped`, `test_executor_error_text_is_never_exposed`, `test_the_runner_queue_is_bounded` (idempotency file), `test_the_worker_thread_runs_jobs_and_stops_cleanly` |
 | Crash and restart | `DeckService.recover_after_restart`, `DeckRuntime` | `test_deck_restart.py`: `test_jobs_found_running_or_queued_after_a_restart_are_settled_and_never_re_run`, `test_the_unknown_outcome_after_a_restart_is_visible_and_not_retriable`, `test_a_job_awaiting_confirmation_survives_a_restart_with_its_deadline_and_nonce`, `test_an_awaiting_job_whose_window_passed_during_the_outage_expires`, `test_recovery_is_idempotent_and_audited`, `test_store_pragmas_and_idempotent_creation` |
 | Own database file | `store.py` | `test_the_deck_has_its_own_database_file`, `test_store_pragmas_and_idempotent_creation` (`test_deck_restart.py`) |
+| Real executor for the owner's PC, against a fake OS layer | `executor_windows.py`, `os_windows.py`, `mount.executor_from_env` | `test_deck_executor_windows.py`: every media key, lock, health, service status, Wake-on-LAN (allowlist only, no request field can carry a MAC), restart (allowlist, `needs_admin`, elevated), refusals for any other host, known failure vs unknown outcome, hang cut off by the runner, jobs labelled `windows`, configuration parsing and executor selection (unknown name stops start-up, pytest never builds the real layer), and read-only probes of the real layer (`test_the_real_layer_answers_read_only_questions`, `test_restarting_a_service_that_does_not_exist_changes_nothing`) |
+| New action types stay on the allowlist | `actions.py` | `test_deck_actions.py`: `media_key` / `lock_workstation` impact, key set, unknown keys, missing arguments; `test_only_the_os_layer_uses_ctypes` |
+| Seed profile `desk` | `seed.py` | `test_deck_seed.py`: slots and labels, only slot 8 asks, idempotency (`created`, `unchanged`, `updated`), device view, mock run |
+| Device parsers and texts | `firmware/lib/oyster_core/src/deck_json.cpp` | `firmware/test/test_deck/` (Unity, native): profiles, jobs, history and error bodies, bounds, hostile input (truncation at every length, 3000 random byte mutations, nesting, oversized values, NUL bytes), request paths and the confirm body, key format, screen texts |
 
-Run them with `python -m pytest tests/deck -o addopts="" -q -p no:cacheprovider`. The tests use a fake clock,
-deterministic ids and nonces, `MockExecutor` and temporary SQLite files; none uses the network.
+Run the backend tests with `python -m pytest tests/deck -o addopts="" -q -p no:cacheprovider` and the device
+parser tests with `pio test -e native -f test_deck` (from `firmware/`, host compiler on PATH, see
+`scripts/_env.ps1`). The backend tests use a fake clock, deterministic ids and nonces, `MockExecutor` or a fake
+OS layer and temporary SQLite files; none uses the network, presses a key or locks a screen.
 
 ## Known gaps
 
-- No real executor, so no real result. Wake-on-LAN, service restarts and health checks are only simulated by
-  the mock; the actions' semantics for a real host are specified above but untested.
-- Firmware screens D10-D22 are not implemented; the device-side retry and "status unknown" reconciliation
-  (UI flow D) are specified by this API (same Idempotency-Key, `GET /v1/deck/jobs/{id}`) but not built.
+- **Unverified on a real session:** media-key presses, the workstation lock, Wake-on-LAN packets and service
+  restarts have only been exercised against a fake OS layer. Whether a given player reacts depends on
+  Windows routing the media key to it; the job result only says the key was sent. Whether a woken host came up
+  is not checked.
+- Service restarts need the backend to run elevated and a service on `OYSTER_DECK_RESTART_SERVICES`; the
+  `ctypes` service-control code has been checked only against a service name that does not exist.
+- The device module compiles and its parsers are host-tested, but it has not run on a Cardputer or against a
+  running backend. Leaving the module with Home while a confirmation is open does not tell the module (the
+  job expires on the backend; the leftover is cancelled the next time the module opens).
 - The nonce proves "the same authenticated device, holding this job's nonce"; the physical key press on the
   device is not observable by the backend. The device must show the confirmation and send `approved` only after
   the user chose it (as for lab jobs, ADR-005).
 - `unknown_outcome` has no reconcile endpoint; the owner reads it, checks the host and starts a new run.
+- Only the local PC is controlled; there is no remote host executor (SSH, WinRM) and no per-host credential
+  handling. A profile that names another host fails with `host_not_local`.
 - Scheduled automations (M6) and conditional macro steps are out of scope: a slot is one action or an ordered
   list of at most three.
 - Audit rows are not pruned or exported; the file grows slowly without bound.

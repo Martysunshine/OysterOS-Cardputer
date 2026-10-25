@@ -5,15 +5,15 @@ impactful (needs an on-device confirmation, ADR-005) is fixed per action type in
 constant, not a field, so no request, profile or stored row can change it. Unknown action types are
 rejected when a profile is defined and again when a slot runs and when the runner executes it.
 
-No real executor ships. `MockExecutor` records calls and executes nothing on any host. A real executor
-must guarantee:
+`MockExecutor` (the default) records calls and executes nothing on any host; `executor_windows.py` is the
+real executor for the owner's own Windows PC. Any executor must guarantee:
   - typed arguments only: it receives these models, never a command string or template;
   - no shell and no string interpolation: the host-side operation is chosen by action type from a fixed
     table and arguments are passed as discrete values (host ids and service names are validated names
     resolved through the executor's own registry, never addresses or paths from a request);
   - a per-action timeout (`timeout_s` below is the ceiling the runner enforces) and no output beyond a
     short redacted summary;
-  - least privilege: a dedicated unprivileged account scoped to the listed hosts and services;
+  - least privilege: the rights of the account that started the backend, never more (no self-elevation);
   - an honest result: raise `ActionOutcomeUnknown` when it cannot tell whether an impactful action ran.
 """
 
@@ -23,7 +23,7 @@ import threading
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Annotated, ClassVar, Literal, Protocol, runtime_checkable
+from typing import Annotated, ClassVar, Literal, Protocol, get_args, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
@@ -91,11 +91,43 @@ class ServiceRestart(_Action):
     timeout_s = 60.0
 
 
+MediaKeyName = Literal["play_pause", "next", "prev", "vol_up", "vol_down", "mute"]
+MEDIA_KEYS: tuple[str, ...] = get_args(MediaKeyName)
+
+
+class MediaKey(_Action):
+    """Presses one system media key on a host. Any player that listens to media keys reacts (a music player,
+    a browser tab, ...); no player API or account is involved. Not impactful: it changes no session state."""
+
+    type: Literal["media_key"] = "media_key"
+    host_id: HostId
+    key: MediaKeyName
+    impactful = False
+    timeout_s = 10.0
+
+
+class LockWorkstation(_Action):
+    """Impactful: locks the interactive session of a host (the user signs in again to continue)."""
+
+    type: Literal["lock_workstation"] = "lock_workstation"
+    host_id: HostId
+    impactful = True
+    timeout_s = 15.0
+
+
 Action = Annotated[
-    Noop | HostHealthCheck | ServiceStatus | WakeOnLan | ServiceRestart,
+    Noop | HostHealthCheck | ServiceStatus | WakeOnLan | ServiceRestart | MediaKey | LockWorkstation,
     Field(discriminator="type"),
 ]
-ACTION_MODELS: tuple[type[_Action], ...] = (Noop, HostHealthCheck, ServiceStatus, WakeOnLan, ServiceRestart)
+ACTION_MODELS: tuple[type[_Action], ...] = (
+    Noop,
+    HostHealthCheck,
+    ServiceStatus,
+    WakeOnLan,
+    ServiceRestart,
+    MediaKey,
+    LockWorkstation,
+)
 ALLOWLIST: Mapping[str, type[_Action]] = MappingProxyType(
     {m.model_fields["type"].default: m for m in ACTION_MODELS}
 )
@@ -160,7 +192,7 @@ class ActionExecutor(Protocol):
 
 
 class MockExecutor:
-    """Test double and the only executor that ships: records calls, executes nothing on any host.
+    """Test double and the default executor: records calls, executes nothing on any host.
 
     `inject(type, kind)` makes the next `times` calls of an action type misbehave: "fail" (ActionFailed),
     "timeout" (ActionTimeout), "lost" (ActionOutcomeUnknown), "error" (unexpected exception) or "hang"

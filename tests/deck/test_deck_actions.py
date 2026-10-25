@@ -9,6 +9,7 @@ import pytest
 from oyster.deck.actions import (
     ACTION_MODELS,
     ALLOWLIST,
+    MEDIA_KEYS,
     ActionFailed,
     ActionOutcomeUnknown,
     ActionRejected,
@@ -27,6 +28,8 @@ EXPECTED_IMPACT = {
     "service_status": False,
     "wake_on_lan": True,
     "service_restart": True,
+    "media_key": False,
+    "lock_workstation": True,
 }
 SAMPLE = {
     "noop": {},
@@ -34,6 +37,8 @@ SAMPLE = {
     "service_status": {"host_id": "h1", "service": "nginx"},
     "wake_on_lan": {"host_id": "h1"},
     "service_restart": {"host_id": "h1", "service": "nginx"},
+    "media_key": {"host_id": "h1", "key": "play_pause"},
+    "lock_workstation": {"host_id": "h1"},
 }
 
 
@@ -145,13 +150,42 @@ def test_service_names_are_validated_names(bad):
 
 
 def test_missing_arguments_are_rejected():
-    for name in ("host_health_check", "service_status", "wake_on_lan", "service_restart"):
+    for name in ("host_health_check", "service_status", "wake_on_lan", "service_restart", "media_key"):
         with pytest.raises(ActionRejected):
             parse_action({"type": name})
+    with pytest.raises(ActionRejected):
+        parse_action({"type": "media_key", "host_id": "h1"})  # the key is required
+    with pytest.raises(ActionRejected):
+        parse_action({"type": "lock_workstation"})
+
+
+@pytest.mark.parametrize("key", MEDIA_KEYS)
+def test_every_media_key_is_accepted(key):
+    action = parse_action({"type": "media_key", "host_id": "h1", "key": key})
+    assert action.key == key and not is_impactful(action)
+
+
+def test_the_media_keys_are_exactly_the_documented_set():
+    assert MEDIA_KEYS == ("play_pause", "next", "prev", "vol_up", "vol_down", "mute")
+
+
+@pytest.mark.parametrize(
+    "bad", ["stop", "PLAY_PAUSE", "play", "", " mute", "mute ", "volume_up", 3, None, ["mute"], "a;b"]
+)
+def test_unknown_media_keys_are_rejected(bad):
+    with pytest.raises(ActionRejected):
+        parse_action({"type": "media_key", "host_id": "h1", "key": bad})
+
+
+def test_locking_is_impactful_and_pressing_a_media_key_is_not():
+    """Both new types are covered by the confirmation rule through their class constants."""
+    assert ALLOWLIST["lock_workstation"].impactful is True
+    assert ALLOWLIST["media_key"].impactful is False
+    assert ALLOWLIST["lock_workstation"].timeout_s == 15
 
 
 def test_no_shell_or_exec_like_field_exists_on_any_action_model():
-    allowed_fields = {"type", "host_id", "service"}
+    allowed_fields = {"type", "host_id", "service", "key"}
     bad_words = re.compile(r"cmd|command|shell|exec|script|argv|args|eval|path|url|param|template|env", re.I)
     for model in ACTION_MODELS:
         assert model.model_config.get("extra") == "forbid"
@@ -163,6 +197,12 @@ def test_no_shell_or_exec_like_field_exists_on_any_action_model():
                 assert any(getattr(m, "pattern", None) for m in field.metadata)
 
 
+# The one module that talks to the operating system (Win32 calls through ctypes); every other file of the
+# package must stay free of it.
+OS_MODULE = "os_windows.py"
+CTYPES = re.compile(r"\bctypes\b")
+
+
 def test_package_source_has_no_shell_exec_or_eval():
     forbidden = re.compile(
         r"\b(subprocess|os\.system|os\.popen|popen|shlex|pty|ctypes)\b|\beval\(|\bexec\(|shell\s*=|"
@@ -172,9 +212,16 @@ def test_package_source_has_no_shell_exec_or_eval():
     hits = []
     for path in sorted(PACKAGE.glob("*.py")):
         for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if path.name == OS_MODULE:
+                line = CTYPES.sub("", line)  # ctypes is the OS layer's tool; everything else stays forbidden
             if forbidden.search(line):
                 hits.append(f"{path.name}:{n}: {line.strip()}")
     assert hits == []
+
+
+def test_only_the_os_layer_uses_ctypes():
+    users = [p.name for p in sorted(PACKAGE.glob("*.py")) if CTYPES.search(p.read_text(encoding="utf-8"))]
+    assert users == [OS_MODULE]
 
 
 def test_timeouts_are_bounded_and_impactful_ones_are_documented_ceilings():

@@ -10,16 +10,18 @@
   (reference counted); the runner also starts itself on the first submitted job, because `oyster serve` runs
   its apps with the lifespan off. Call `app.state.deck.stop()` at shutdown for a clean worker stop.
 - Idempotent: installing twice on one app changes nothing.
-- Executor: only the mock executor ships. Nothing is executed on any host; the wire format labels jobs with
-  `"executor": "mock"` and the runtime logs a warning at start-up.
+- Executor: chosen by `OYSTER_DECK_EXECUTOR` (`mock`, the default, or `windows`; see `executor_from_env`).
+  The mock executes nothing on any host; jobs are labelled `"executor": "mock"` or `"windows"` on the wire and
+  the runtime logs which one is active at start-up. An invalid setting stops start-up with a clear error.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -27,11 +29,47 @@ from fastapi import FastAPI
 
 from oyster.deck.actions import ActionExecutor, MockExecutor
 from oyster.deck.api import device_router, owner_router
+from oyster.deck.executor_windows import ExecutorConfigError, OsLayer, WindowsExecutor, WindowsExecutorConfig
 from oyster.deck.jobs import DeckConfig, DeckService, RateLimiter
 from oyster.deck.runner import DeckRunner
 from oyster.deck.store import DB_NAME, DeckStore
 
 log = logging.getLogger("oyster.deck")
+
+
+def executor_from_env(
+    env: Mapping[str, str] | None = None, *, os_layer: OsLayer | None = None
+) -> ActionExecutor:
+    """Build the executor named by the environment (default `mock`, so tests and unattended runs are safe).
+
+    OYSTER_DECK_EXECUTOR        mock | windows
+    OYSTER_DECK_LOCAL_HOST_ID   host id that means "this PC" (default this-pc)
+    OYSTER_DECK_WOL_HOSTS       host_id=MAC;host_id=MAC  (the only source of Wake-on-LAN targets)
+    OYSTER_DECK_WOL_BROADCAST   IPv4 broadcast address for magic packets (default 255.255.255.255)
+    OYSTER_DECK_RESTART_SERVICES  comma-separated Windows service names the executor may restart
+
+    `os_layer` replaces the real Windows layer (tests); it is only used for `windows`. Raises
+    ExecutorConfigError for an unknown executor or an invalid setting (values are never echoed).
+
+    A test run (pytest sets PYTEST_CURRENT_TEST) never builds the real Windows layer on its own: the process
+    environment may carry the owner's `windows` setting from backend/.env, and a test must not press keys or
+    lock the screen. Such a run gets the mock unless it passes an explicit `os_layer`.
+    """
+    env = os.environ if env is None else env
+    kind = (env.get("OYSTER_DECK_EXECUTOR") or "mock").strip().lower()
+    if kind == "mock":
+        return MockExecutor()
+    if kind != "windows":
+        raise ExecutorConfigError("OYSTER_DECK_EXECUTOR must be 'mock' or 'windows'")
+    if os_layer is None and "PYTEST_CURRENT_TEST" in os.environ:
+        log.warning("OYSTER_DECK_EXECUTOR=windows ignored under pytest: the mock executor is used")
+        return MockExecutor()
+    config = WindowsExecutorConfig.from_env(env)
+    if os_layer is None:
+        from oyster.deck.os_windows import WindowsOsLayer  # only here: the one module that touches the OS
+
+        os_layer = WindowsOsLayer(wol_broadcast=config.wol_broadcast)
+    return WindowsExecutor(os_layer, config)
 
 
 class DeckRuntime:
@@ -70,6 +108,8 @@ class DeckRuntime:
             log.warning("deck startup: %s job(s) left by a previous process were settled", self.recovered)
         if self.executor.kind == "mock":
             log.warning("Control Deck uses the mock executor: actions are recorded, nothing is executed")
+        else:
+            log.warning("Control Deck executor '%s': actions run on this machine", self.executor.kind)
         self._users = 0
         self._lock = threading.Lock()
 
@@ -100,7 +140,7 @@ def shared_runtime(data_dir: Path) -> DeckRuntime:
     with _shared_lock:
         rt = _shared.get(key)
         if rt is None:
-            rt = _shared[key] = DeckRuntime(key)
+            rt = _shared[key] = DeckRuntime(key, executor=executor_from_env())
         return rt
 
 
