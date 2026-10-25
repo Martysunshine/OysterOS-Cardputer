@@ -31,6 +31,7 @@
 #include "radio_scheduler.h"
 #include "results_cache.h"
 #include "serial_provisioning.h"
+#include "status_led.h"
 #include "telemetry.h"
 #include "ui.h"
 
@@ -2773,8 +2774,25 @@ void AppController::begin() {
   draw(millis());
 }
 
+// The status LED mirrors the mode banner and the connection state (see status_led.h for the patterns).
+statusled::Pattern led_pattern() {
+  if (!s_runtime) return statusled::Pattern::Error;
+  if (current_mode() == ModeBanner::LiveRadio) return statusled::Pattern::LiveRadio;
+  if (s_start_fail != 0) return statusled::Pattern::Error;
+  switch (backend_conn()) {
+    case ui::Conn::Online: return statusled::Pattern::Online;
+    case ui::Conn::Connecting: return statusled::Pattern::Connecting;
+    case ui::Conn::Error: return statusled::Pattern::Error;
+    case ui::Conn::Offline:
+    case ui::Conn::Unknown:
+    default: return statusled::Pattern::Offline;
+  }
+}
+
 void AppController::tick() {
   const uint32_t now = millis();
+  statusled::set(led_pattern());
+  statusled::tick(now);
   if (g_board.go_pressed() && !s_locked && lock_allowed()) enter_lock();
   bool keys_consumed = false;
   if (s_locked) {

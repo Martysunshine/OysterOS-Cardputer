@@ -23,6 +23,7 @@
 #include "radio_scheduler.h"
 #include "results_cache.h"
 #include "serial_provisioning.h"
+#include "status_led.h"
 #include "telemetry.h"
 #include "ui.h"
 #include "assets.h"
@@ -61,6 +62,7 @@ void splash(const char* step) {
   std::snprintf(left, sizeof(left), "Starting: %s", step);
   ui::draw_footer(left, "v" OYSTER_FIRMWARE_VERSION);
   ui::tick_start_screen();
+  statusled::tick(millis());
 }
 
 // After start-up the logo stays on screen until a key is pressed. The loader keeps its slow blink, and the
@@ -72,6 +74,7 @@ void wait_for_start_key(uint32_t splash_start) {
     M5Cardputer.update();
     g_provisioning.poll();
     ui::tick_start_screen();
+    statusled::tick(millis());
     ui::refresh_start_footer(g_board.battery_percent());
     if (millis() - splash_start >= kMinSplashMs && M5Cardputer.Keyboard.isChange() &&
         M5Cardputer.Keyboard.isPressed()) {
@@ -169,6 +172,8 @@ void setup() {
   Serial.begin(115200);
 
   g_board.begin();
+  statusled::begin();
+  statusled::set(statusled::Pattern::Boot);
   ui::begin();
   s_boot.ui = ui::ready();
   if (!s_boot.ui) Serial.printf("[oyster] display sprites unavailable (out of memory): screen output disabled\n");
