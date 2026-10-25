@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "rooms": [
+    {
+      "id": "living",
+      "name": "Living room",
+      "entities": [
+        {"entity_id": "light.living_ceiling", "label": "Ceiling light", "actions": ["turn_on", "turn_off", "toggle"]},
+        {"entity_id": "switch.living_fan", "label": "Fan", "actions": ["turn_on", "turn_off"]},
+        {"entity_id": "cover.living_blinds", "label": "Blinds", "actions": ["turn_on", "turn_off"]}
+      ]
+    },
+    {
+      "id": "hall",
+      "name": "Hall",
+      "entities": [
+        {"entity_id": "lock.front_door", "label": "Front door", "actions": ["turn_on", "turn_off"]},
+        {"entity_id": "light.hall_lamp", "label": "Hall lamp", "actions": ["toggle"]}
+      ]
+    },
+    {
+      "id": "office",
+      "name": "Office",
+      "entities": [
+        {"entity_id": "switch.office_heater", "label": "Heater", "actions": ["turn_on", "turn_off"], "impactful": true},
+        {"entity_id": "scene.office_focus", "label": "Focus scene", "actions": ["turn_on"]}
+      ]
+    }
+  ]
+}
