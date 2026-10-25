@@ -105,8 +105,11 @@ function Test-CertNamesIp {
     param([string]$Path, [string]$Ip)
     if (-not (Test-Path -LiteralPath $Path)) { return $false }
     try {
+        # PEM -> DER by hand: works in Windows PowerShell 5.1 as well as PowerShell 7 (no CreateFromPem there).
         $pem = Get-Content -LiteralPath $Path -Raw
-        $c = [System.Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromPem($pem)
+        $b64 = (($pem -split "`n") | Where-Object { $_ -notmatch '^-----' }) -join ''
+        $der = [Convert]::FromBase64String($b64.Trim())
+        $c = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 -ArgumentList (, $der)
         $san = $c.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' } | Select-Object -First 1
         if (-not $san) { return $false }
         return ($san.Format($true) -match ('IP Address=' + [regex]::Escape($Ip) + '(\s|$)'))
