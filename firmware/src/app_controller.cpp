@@ -2683,6 +2683,7 @@ void go_home(uint32_t now) {
     if (before(now, s_pc_guard_until)) return;  // keys typed before the dialog was readable
     if (s_pc_shown) resolve_pending(false);
   }
+  if (s_cur == Screen::Module) modules::cancel(s_module);  // a module's confirmation is rejected, not left open
   nav_home();
 }
 

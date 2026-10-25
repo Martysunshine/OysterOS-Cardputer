@@ -13,6 +13,7 @@
 #include "assessment_runner.h"
 #include "backend_client.h"
 #include "backend_internal.h"
+#include "radio_scheduler.h"
 
 namespace oyster::modules {
 
@@ -69,7 +70,12 @@ bool backend_ready() { return g_backend.state() == BackendState::Connected; }
 
 int http(const char* method, const char* path, const char* body, size_t body_len, char* resp, size_t cap,
          size_t* resp_len, bool idempotent, const char* idempotency_key) {
-  return g_backend.call(method, path, body, body_len, resp, cap, resp_len, idempotent, idempotency_key);
+  if (resp_len != nullptr) *resp_len = 0;
+  if (resp != nullptr && cap > 0) resp[0] = '\0';
+  if (!g_radio.acquire(RadioPhase::UplinkSync, 0)) return kHttpRadioBusy;  // a survey or BLE session runs
+  const int st = g_backend.call(method, path, body, body_len, resp, cap, resp_len, idempotent, idempotency_key);
+  g_radio.release(RadioPhase::UplinkSync);
+  return st;
 }
 
 const char* last_error() { return backend_detail::last_error(); }

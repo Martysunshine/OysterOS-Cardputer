@@ -965,16 +965,11 @@ void handle_request(WorkRequest& r) {
       break;
     case RequestKind::SyncNow:
       break;
-    case RequestKind::Module: {
-      Uplink up;
-      if (!up.held()) {
-        toast("Radio busy; try again");
-        modules::changed();
-        break;
-      }
+    case RequestKind::Module:
+      // No radio lease here: a module that talks to the backend leases the uplink inside modules::http()
+      // for the duration of that one request, so a call that needs no radio (an IR send) is never refused.
       modules::run_call(r.module_id, r.call_id, r.arg);
       break;
-    }
   }
   s_sync_now.store(true);  // upload the new evidence soon
 }

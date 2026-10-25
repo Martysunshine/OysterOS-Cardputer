@@ -86,7 +86,9 @@ void changed();
 void toast(const char* text);
 // True when the device has a backend configuration and the backend client is not in a failed state.
 bool backend_ready();
-// One authenticated request to the backend (worker task only). Returns the HTTP status, or a negative value
+// Returned by http() when another radio phase (Wi-Fi survey, BLE) is active: nothing was sent, retry later.
+constexpr int kHttpRadioBusy = -2;
+// One authenticated request to the backend (worker task only). The uplink is leased for this one request. Returns the HTTP status, or a negative value
 // when the transport failed or the response was too large. The response is copied into `resp` (NUL-terminated,
 // truncated at cap-1). Only paths under /v1/ are accepted. `idempotent` allows one automatic retry on a dead
 // keep-alive connection: pass false for anything that must not run twice.
