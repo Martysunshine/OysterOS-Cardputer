@@ -1,7 +1,10 @@
-# Oyster Pocket - 8 MB flash, single factory app, no OTA (v1). Total = 0x800000.
+# Oyster Pocket - 8 MB flash, single factory app, no OTA slots (v1). Total = 0x800000.
+# otadata sits at 0xE000 because every upload writes boot_app0.bin (an 8 KiB otadata image) to 0xE000; the
+# previous table gave that range to nvs and phy_init, so each upload overwrote the last NVS page. There is no
+# phy_init partition: this Arduino build links the PHY init data into the app (CONFIG_ESP_PHY_INIT_DATA_IN_PARTITION is not set).
 # Name,    Type, SubType,  Offset,   Size
-nvs,       data, nvs,      0x9000,   0x6000
-phy_init,  data, phy,      0xF000,   0x1000
+nvs,       data, nvs,      0x9000,   0x5000
+otadata,   data, ota,      0xE000,   0x2000
 factory,   app,  factory,  0x10000,  0x500000
 spiffs,    data, spiffs,   0x510000, 0x2E0000
 coredump,  data, coredump, 0x7F0000, 0x10000

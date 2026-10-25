@@ -130,8 +130,8 @@ The image is a full-flash build with its own partition table and no OTA slot
 
 | Partition | Type | Offset | Size |
 | --- | --- | --- | --- |
-| `nvs` | data | `0x9000` | `0x6000` |
-| `phy_init` | data | `0xF000` | `0x1000` |
+| `nvs` | data | `0x9000` | `0x5000` |
+| `otadata` | data | `0xE000` | `0x2000` |
 | `factory` | app | `0x10000` | `0x500000` |
 | `spiffs` (used as LittleFS) | data | `0x510000` | `0x2E0000` |
 | `coredump` | data | `0x7F0000` | `0x10000` |
