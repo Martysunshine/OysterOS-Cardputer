@@ -14,7 +14,7 @@
 
 namespace oyster {
 
-enum class RequestKind : uint8_t { WifiSurvey, BleDiscover, InspectGatt, ReadValue, AskOyster, CancelRun, SyncNow };
+enum class RequestKind : uint8_t { WifiSurvey, BleDiscover, InspectGatt, ReadValue, AskOyster, CancelRun, SyncNow, Module };
 
 struct WorkRequest {
   RequestKind kind;
@@ -24,6 +24,9 @@ struct WorkRequest {
   char question[cfg::kMaxQuestionLen + 1];
   bool active_scan;
   uint32_t duration_ms;   // 0 = default
+  uint8_t module_id;      // RequestKind::Module: modules::Id
+  uint8_t call_id;        //   module-defined call number
+  char arg[48];           //   module-defined argument text
 };
 
 struct PendingConfirmation {

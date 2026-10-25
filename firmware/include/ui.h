@@ -95,7 +95,12 @@ void draw_animation_frame(const assets::Animation& anim, uint8_t frame);
 // period (no task or timer: the caller's loop drives it). clear_screen() paints the whole panel in the
 // background colour, so no splash pixels remain between the regions of the next screen.
 void draw_start_screen(const char* left, const char* right);
+void draw_start_image();  // the image alone (also restarts the loader at frame 0)
 void tick_start_screen();
+// Action strip of the start / lock screen: key hint on the left, battery icon with percentage on the right
+// (pct < 0 = unknown). refresh_start_footer() redraws only when the percentage changed.
+void draw_start_footer(const char* left, int battery_pct);
+void refresh_start_footer(int battery_pct);
 void clear_screen();
 
 }  // namespace ui

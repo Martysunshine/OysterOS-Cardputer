@@ -67,11 +67,12 @@ void splash(const char* step) {
 // USB provisioning port is still serviced, so the device can be set up from the PC while it waits.
 void wait_for_start_key(uint32_t splash_start) {
   if (!s_boot.ui) return;
-  ui::draw_footer("Any key:Start", "v" OYSTER_FIRMWARE_VERSION);
+  ui::draw_start_footer("Any key:Start", g_board.battery_percent());
   for (;;) {
     M5Cardputer.update();
     g_provisioning.poll();
     ui::tick_start_screen();
+    ui::refresh_start_footer(g_board.battery_percent());
     if (millis() - splash_start >= kMinSplashMs && M5Cardputer.Keyboard.isChange() &&
         M5Cardputer.Keyboard.isPressed()) {
       break;

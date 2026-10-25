@@ -606,11 +606,61 @@ uint8_t s_loader_frame = 0;
 uint32_t s_loader_ms = 0;
 }  // namespace
 
+static char s_start_left[32] = {};
+static int s_start_pct = -2;  // -2: no start footer drawn yet
+
+// Battery icon, right-aligned at `right` in band coordinates: 20x10 body, 2x4 nub, fill in 16 steps.
+static void battery_icon(int right, int pct) {
+  const int body_w = 20, body_h = 10, x = right - body_w - 2, y = 3;
+  s_band.drawRect(x, y, body_w, body_h, kTextPrimary);
+  s_band.fillRect(x + body_w, y + 3, 2, 4, kTextPrimary);
+  if (pct < 0) return;  // unknown: empty outline
+  int bars = (pct * 16 + 50) / 100;
+  if (bars < 1 && pct > 0) bars = 1;
+  const uint16_t c = pct >= 40 ? kAccent : (pct >= 20 ? kWarning : kError);
+  if (bars > 0) s_band.fillRect(x + 2, y + 2, bars, body_h - 4, c);
+}
+
 void draw_start_screen(const char* left, const char* right) {
+  draw_start_image();
+  draw_footer(left, right);
+  s_start_left[0] = '\0';
+  s_start_pct = -2;
+}
+
+void draw_start_image() {
   draw_image(assets::splash(), 0, 0, 0);
   s_loader_frame = 0;
   s_loader_ms = millis();
-  draw_footer(left, right);
+}
+
+void draw_start_footer(const char* left, int battery_pct) {
+  if (!s_ready) return;
+  std::snprintf(s_start_left, sizeof(s_start_left), "%s", left ? left : "");
+  s_start_pct = battery_pct < 0 ? -1 : (battery_pct > 100 ? 100 : battery_pct);
+  band_fill(kSurfaceBase);
+  const int right = kPadX + kInnerW;
+  char pct[8];
+  if (s_start_pct >= 0) {
+    std::snprintf(pct, sizeof(pct), "%d%%", s_start_pct);
+  } else {
+    std::snprintf(pct, sizeof(pct), "--%%");
+  }
+  const int icon_right = right;
+  const int text_x = icon_right - 22 - 3 - static_cast<int>(std::strlen(pct)) * kMetaW;
+  battery_icon(icon_right, s_start_pct);
+  text(pct, text_x, 4, kTextMuted, true);
+  const int cols = (text_x - 4 - kPadX) / kBodyW;
+  char lbuf[kFooterCols + 1];
+  fit(s_start_left, SIZE_MAX, lbuf, cols > 0 ? (cols < kFooterCols ? cols : kFooterCols) : 1);
+  hint_text(lbuf, kPadX, 0, false, kTextPrimary, kAccent);
+  band_push(kFooterY);
+}
+
+void refresh_start_footer(int battery_pct) {
+  if (s_start_left[0] == '\0') return;  // nothing drawn by draw_start_footer
+  const int p = battery_pct < 0 ? -1 : (battery_pct > 100 ? 100 : battery_pct);
+  if (p != s_start_pct) draw_start_footer(s_start_left, p);
 }
 
 void tick_start_screen() {

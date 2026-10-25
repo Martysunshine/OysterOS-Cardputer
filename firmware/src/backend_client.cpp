@@ -1008,6 +1008,23 @@ bool BackendClient::poll_run(const char* run_id, RunSummary& out) {
   return true;
 }
 
+int BackendClient::call(const char* method, const char* path, const char* body, size_t body_len, char* resp,
+                        size_t cap, size_t* resp_len, bool idempotent) {
+  Lock l;
+  if (resp_len != nullptr) *resp_len = 0;
+  if (resp != nullptr && cap > 0) resp[0] = '\0';
+  if (method == nullptr || path == nullptr || std::strncmp(path, "/v1/", 4) != 0) return kErrIo;
+  if (body_len > kReqCap) return kErrTooLarge;
+  const int st = http(method, path, body, body_len, true, idempotent ? Retry::Once : Retry::Never);
+  if (resp != nullptr && cap > 0 && s_resp_len > 0) {
+    const size_t n = s_resp_len < cap - 1 ? s_resp_len : cap - 1;
+    std::memcpy(resp, s_resp, n);
+    resp[n] = '\0';
+    if (resp_len != nullptr) *resp_len = n;
+  }
+  return st;
+}
+
 bool BackendClient::cancel_run(const char* run_id) {
   Lock l;
   if (run_id == nullptr || !is_prefixed_id(run_id, "run-")) return false;

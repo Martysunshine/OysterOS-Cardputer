@@ -19,7 +19,7 @@ enum class Screen : uint8_t {
   Boot, Provisioning, BoardError, MainMenu,
   Security, WifiSurvey, BleExplorer, Targets, Assess, AskOyster, Evidence, Settings,
   WifiResults, BleResults, GattTree, Detail,
-  RunView, ConfirmDialog, TextEntry, Message,
+  RunView, ConfirmDialog, TextEntry, Message, Module,
   Unavailable, Help, KeyTest,  // keep KeyTest last (kScreenCount in app_controller.cpp)
 };
 

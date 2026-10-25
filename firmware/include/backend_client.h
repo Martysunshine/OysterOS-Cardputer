@@ -49,6 +49,12 @@ class BackendClient {
   bool register_session(const char* session_id);
   bool fetch_time(uint64_t& unix_seconds);   // unauthenticated GET /v1/time clock hint
   const RunSummary& latest_run() const;
+  // Generic authenticated request for the modules (hosts, deck, home). Returns the HTTP status, or a negative
+  // value when the transport failed or the response was too large. The response is copied into `resp`
+  // (NUL-terminated, truncated at cap-1). Only /v1/ paths. `idempotent`: one automatic retry on a dead
+  // keep-alive connection is allowed; pass false for anything that must not run twice.
+  int call(const char* method, const char* path, const char* body, size_t body_len, char* resp, size_t cap,
+           size_t* resp_len, bool idempotent);
   // Drop the cached token, CA and connection (after FACTORY-RESET or re-provisioning) so the next request
   // re-reads DeviceConfig. Safe to call from any task.
   void invalidate_credentials();

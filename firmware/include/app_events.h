@@ -16,6 +16,7 @@ enum class AppEventType : uint8_t {
   RunUpdated,             // AI run changed; UI re-reads latest run
   StorageChanged,         // a = SdState
   Toast,                  // text
+  ModuleChanged,          // a module's data changed (src/modules): redraw its page and the Home tile
 };
 
 enum class ResultKind : uint8_t { Wifi, Ble, Gatt, Read };

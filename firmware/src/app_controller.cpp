@@ -24,6 +24,7 @@
 #include "board_support.h"
 #include "device_config.h"
 #include "evidence_store.h"
+#include "modules.h"
 #include "oyster_core/ids.h"
 #include "oyster_core/json_writer.h"
 #include "oyster_core/lab_profile_gen.h"
@@ -280,6 +281,12 @@ AssessItem s_aitems[4 + lab::kCharCount + 4];
 uint8_t s_acount = 0;
 
 uint8_t s_unavailable = 0;  // kUnavailable index shown by Screen::Unavailable
+// Module screens (src/modules): the module that is open, the page it last reported, and the key guard of a
+// confirmation page.
+modules::Id s_module = modules::Id::Hosts;
+modules::PageView s_view;
+uint8_t s_view_page = 0xFF;
+uint32_t s_module_guard_until = 0;
 Screen s_help_from = Screen::MainMenu;
 uint16_t s_help_saved_scroll = 0;
 
@@ -1110,6 +1117,7 @@ const char* screen_hint(Screen s, const char** name) {
     case Screen::RunView: *name = "Oyster AI run [A11/A12]"; return "Status and answer pages. ; . scroll.";
     case Screen::Settings: *name = "Settings [P10]"; return "Enter opens an entry. , / adjust the brightness.";
     case Screen::Unavailable: *name = "Unavailable module"; return "This module is not in this build. Back returns.";
+    case Screen::Module: *name = modules::name(s_module); return "Enter opens the selected row. Back goes up one level. r refreshes where offered.";
     case Screen::Message: *name = "Message"; return "; . scroll. Back returns.";
     default: *name = "This screen"; return "Back returns.";
   }
@@ -1566,6 +1574,31 @@ void open_help() {
   nav_go(Screen::Help);
 }
 
+void open_module(modules::Id id) {
+  const modules::Ops& o = modules::ops(id);
+  const char* why = nullptr;
+  if (o.available != nullptr && !o.available(&why)) {
+    show_message("!Unavailable", why != nullptr ? why : "Not available right now.");
+    return;
+  }
+  s_module = id;
+  s_view_page = 0xFF;
+  modules::open(id);
+  nav_go(Screen::Module);
+}
+
+// The view of the open module, refreshed once per redraw. A new page resets selection and scroll and, for a
+// confirmation, restarts the key guard (a key pressed before the page was readable never answers it).
+void refresh_module_view(uint32_t now) {
+  modules::view(s_module, s_view);
+  if (s_view.page_id != s_view_page) {
+    s_view_page = s_view.page_id;
+    s_nav[sidx(Screen::Module)] = ListNav{};
+    s_scroll = 0;
+    if (s_view.kind == modules::PageKind::Confirm) s_module_guard_until = now + kConfirmGuardMs;
+  }
+}
+
 void home_action(uint8_t idx) {
   if (idx >= kHomeCount) return;
   switch (kHome[idx].item) {
@@ -1573,10 +1606,10 @@ void home_action(uint8_t idx) {
     case HomeItem::OysterAi: nav_go(Screen::AskOyster); break;
     case HomeItem::Settings: nav_go(Screen::Settings); break;
     case HomeItem::Help: open_help(); break;
-    case HomeItem::Linux: s_unavailable = 0; nav_go(Screen::Unavailable); break;
-    case HomeItem::ControlDeck: s_unavailable = 1; nav_go(Screen::Unavailable); break;
-    case HomeItem::SmartHome: s_unavailable = 2; nav_go(Screen::Unavailable); break;
-    case HomeItem::OriginalApps: s_unavailable = 3; nav_go(Screen::Unavailable); break;
+    case HomeItem::Linux: open_module(modules::Id::Hosts); break;
+    case HomeItem::ControlDeck: open_module(modules::Id::Deck); break;
+    case HomeItem::SmartHome: open_module(modules::Id::SmartHome); break;
+    case HomeItem::OriginalApps: open_module(modules::Id::Original); break;
   }
 }
 
@@ -1997,6 +2030,36 @@ void dispatch(NavEvent e, char c) {
     case Screen::KeyTest:  // handled by keytest_input() in handle_input()
       return;
 
+    case Screen::Module: {
+      const modules::PageView& v = s_view;
+      s_dirty_content = s_dirty_footer = true;
+      if (v.kind == modules::PageKind::Confirm) {
+        if (before(now, s_module_guard_until)) return;  // keys typed before the page was readable
+        if (e == NavEvent::Select) {
+          modules::select(s_module, 0);
+        } else if (e == NavEvent::Back && !modules::back(s_module)) {
+          nav_back();
+        }
+        return;
+      }
+      if (e == NavEvent::Back) {
+        if (!modules::back(s_module)) nav_back();
+      } else if (modules::key(s_module, e, c)) {
+        // handled by the module (refresh, number keys, ...)
+      } else if (v.kind == modules::PageKind::List) {
+        if (e == NavEvent::Select && v.count > 0) {
+          modules::select(s_module, nv.sel);
+        } else {
+          list_move(nv, v.count, e);
+        }
+      } else if (e == NavEvent::Select) {
+        modules::select(s_module, 0);
+      } else {
+        scroll_message(e);
+      }
+      return;
+    }
+
     case Screen::Detail:
     case Screen::Message:
     case Screen::Evidence:
@@ -2104,6 +2167,9 @@ void handle_event(const AppEvent& ev) {
       s_dirty_status = true;
       if (s_cur == Screen::Evidence || s_cur == Screen::Settings) s_dirty_content = true;
       break;
+    case AppEventType::ModuleChanged:
+      if (s_cur == Screen::Module || s_cur == Screen::MainMenu) s_dirty_content = s_dirty_footer = true;
+      break;
     case AppEventType::Toast:
       toast("%.60s", ev.text);
       // The runner reports a refused request (no session, not enrolled, radio busy) with a toast only.
@@ -2200,6 +2266,10 @@ void render_message_screen() {
     build_help(s_live_body, sizeof(s_live_body));
     title = "Help";
     body = s_live_body;
+  } else if (s_cur == Screen::Module) {
+    copy_str(s_live_body, sizeof(s_live_body), s_view.body);
+    title = s_view.title;
+    body = s_live_body;
   } else if (s_cur == Screen::Unavailable) {
     const UnavailableModule& m = kUnavailable[s_unavailable < kUnavailableCount ? s_unavailable : 0];
     copy_str(s_live_body, sizeof(s_live_body), m.body);
@@ -2222,6 +2292,9 @@ void render_home(const ListNav& nv) {
     const HomeTile& h = kHome[i];
     bool enabled = true;
     const char* what = "";
+    modules::Id mod = modules::Id::Hosts;
+    bool has_mod = false;
+    char mod_text[16] = {};
     switch (h.item) {
       case HomeItem::Security:
         what = (current_mode() == ModeBanner::LiveRadio) ? "scanning" : "Wi-Fi, BLE";
@@ -2229,15 +2302,19 @@ void render_home(const ListNav& nv) {
       case HomeItem::OysterAi: what = backend_short(); break;
       case HomeItem::Settings: what = "device"; break;
       case HomeItem::Help: what = "keys"; break;
-      case HomeItem::Linux:
-      case HomeItem::ControlDeck:
-      case HomeItem::SmartHome:
-      case HomeItem::OriginalApps:
-        what = "unavailable";
-        enabled = false;
-        break;
+      case HomeItem::Linux: mod = modules::Id::Hosts; has_mod = true; break;
+      case HomeItem::ControlDeck: mod = modules::Id::Deck; has_mod = true; break;
+      case HomeItem::SmartHome: mod = modules::Id::SmartHome; has_mod = true; break;
+      case HomeItem::OriginalApps: mod = modules::Id::Original; has_mod = true; break;
     }
-    std::snprintf(details[i], sizeof(details[i]), "%u %s", static_cast<unsigned>(h.number), what);
+    if (has_mod) {
+      modules::tile_status(mod, mod_text, sizeof(mod_text));
+      what = mod_text;
+      const modules::Ops& o = modules::ops(mod);
+      const char* why = nullptr;
+      enabled = o.available == nullptr || o.available(&why);
+    }
+    std::snprintf(details[i], sizeof(details[i]), "%u %.11s", static_cast<unsigned>(h.number), what);
     tiles[i] = ui::Tile{h.icon, h.label, details[i], enabled};
   }
   char title[80];
@@ -2420,6 +2497,21 @@ void render_content(uint32_t now) {
     case Screen::Unavailable:
       render_message_screen();
       break;
+    case Screen::Module:
+      switch (s_view.kind) {
+        case modules::PageKind::List:
+          clamp_nav(nv, s_view.count);
+          ui::draw_list(ui::ListModel{s_view.title, s_view.count, nv.sel, nv.top, s_view.row, s_view.row_disabled,
+                                      s_view.empty});
+          break;
+        case modules::PageKind::Text:
+          render_message_screen();
+          break;
+        case modules::PageKind::Confirm:
+          ui::draw_confirm(s_view.confirm_operation, s_view.confirm_target, s_view.confirm_effect);
+          break;
+      }
+      break;
     case Screen::KeyTest:
       render_keytest();
       break;
@@ -2472,6 +2564,14 @@ void default_footer(char* left, size_t ln, char* right, size_t rn) {
       std::snprintf(left, ln, "Del:Back ;.:Scroll");
       std::snprintf(right, rn, "%u/%u", static_cast<unsigned>(s_scroll) + 1,
                     static_cast<unsigned>(s_msg_total > 0 ? s_msg_total : 1));
+      break;
+    case Screen::Module:
+      std::snprintf(left, ln, "%s", s_view.left);
+      std::snprintf(right, rn, "%s", s_view.right);
+      if (s_view.kind == modules::PageKind::Text) {
+        std::snprintf(right, rn, "%u/%u", static_cast<unsigned>(s_scroll) + 1,
+                      static_cast<unsigned>(s_msg_total > 0 ? s_msg_total : 1));
+      }
       break;
     case Screen::KeyTest:
       std::snprintf(left, ln, "Del Del:Leave");
@@ -2534,6 +2634,7 @@ void render_footer(uint32_t now) {
 }
 
 void draw(uint32_t now) {
+  if (s_cur == Screen::Module) refresh_module_view(now);
   if (s_dirty_status || now - s_last_status_ms >= kStatusRefreshMs) {
     ui::draw_status(current_mode(), strip_prefix(s_session, "sess-"), backend_short(), g_board.battery_percent(),
                     backend_conn());
@@ -2595,6 +2696,8 @@ bool help_allowed() {
     case Screen::ConfirmDialog:
     case Screen::TextEntry:
       return false;
+    case Screen::Module:
+      return s_view.kind != modules::PageKind::Confirm;
     default:
       return true;
   }
@@ -2614,13 +2717,17 @@ bool lock_allowed() {
 
 void enter_lock() {
   s_locked = true;
-  ui::draw_start_screen("Any key:Unlock", "OYSTER OS");
+  ui::draw_start_image();
+  ui::draw_start_footer("Any key:Unlock", g_board.battery_percent());
 }
 
 void leave_lock(uint32_t now) {
   s_locked = false;
   s_swallow = true;
   if (s_cur == Screen::ConfirmDialog) s_pc_guard_until = now + kConfirmGuardMs;
+  if (s_cur == Screen::Module && s_view.kind == modules::PageKind::Confirm) {
+    s_module_guard_until = now + kConfirmGuardMs;
+  }
   ui::clear_screen();
   mark_all();
 }
@@ -2633,6 +2740,7 @@ void AppController::set_startup_failures(uint8_t mask) { s_start_fail = static_c
 
 void AppController::begin() {
   ui::begin();
+  modules::begin();
   s_runtime = g_board.info().is_cardputer_adv;
   for (uint8_t i = 0; i < lab::kCharCount; ++i) s_lab_char_ok[i] = parse_uuid128(lab::kChars[i].uuid, s_lab_char_uuid[i]);
   s_lab_svc_ok = parse_uuid128(lab::kServiceUuid, s_lab_svc_uuid);
@@ -2674,8 +2782,9 @@ void AppController::tick() {
       const NavOutput nav = s_input.map(k);
       if (nav.count > 0 && nav.events[0] == NavEvent::Cancel) {  // Cancel is always the first event
         if (s_cur == Screen::ConfirmDialog && s_pc_shown) resolve_pending(false);
+        if (s_cur == Screen::Module) modules::cancel(s_module);
         emergency_cancel();
-        ui::draw_footer("Cancelled", "Any key:Unlock");
+        ui::draw_start_footer("Cancelled", g_board.battery_percent());
       } else if (any_key(k)) {
         leave_lock(now);
         keys_consumed = true;
@@ -2688,6 +2797,7 @@ void AppController::tick() {
         poll_state(now);
       }
       ui::tick_start_screen();
+      ui::refresh_start_footer(g_board.battery_percent());
       screen_ = s_cur;
       return;  // nothing of the covered screen is drawn
     }
@@ -2706,6 +2816,7 @@ void AppController::tick() {
     s_last_poll_ms = now;
     poll_state(now);
   }
+  if (s_cur == Screen::Module && modules::tick(s_module, now)) s_dirty_content = s_dirty_footer = true;
   const bool live = s_cur == Screen::Evidence || s_cur == Screen::RunView ||
                     (s_cur == Screen::Detail && s_detail_builder != nullptr) || progress_visible();
   if (live && now - s_last_live_ms >= kLiveRefreshMs) {
@@ -2723,6 +2834,7 @@ void AppController::handle_input(const NavOutput& nav) {
     if (e == NavEvent::None) continue;
     if (e == NavEvent::Cancel) {
       if (s_cur == Screen::ConfirmDialog && s_pc_shown) resolve_pending(false);
+      if (s_cur == Screen::Module) modules::cancel(s_module);
       emergency_cancel();
       // Acknowledge on screen in this same loop iteration (target: within cfg::kUiCancelAckMs).
       draw(millis());

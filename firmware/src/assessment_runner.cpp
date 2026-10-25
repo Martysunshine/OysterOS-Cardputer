@@ -27,6 +27,7 @@
 #include "ble_explorer.h"
 #include "device_config.h"
 #include "evidence_store.h"
+#include "modules.h"
 #include "net_link.h"
 #include "operations.h"
 #include "oyster_core/clock_policy.h"
@@ -964,6 +965,16 @@ void handle_request(WorkRequest& r) {
       break;
     case RequestKind::SyncNow:
       break;
+    case RequestKind::Module: {
+      Uplink up;
+      if (!up.held()) {
+        toast("Radio busy; try again");
+        modules::changed();
+        break;
+      }
+      modules::run_call(r.module_id, r.call_id, r.arg);
+      break;
+    }
   }
   s_sync_now.store(true);  // upload the new evidence soon
 }
