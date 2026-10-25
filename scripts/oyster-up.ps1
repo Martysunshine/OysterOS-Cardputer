@@ -16,6 +16,7 @@
    5. Provisions the device over USB serial (docs/PROVISIONING.md): device id, backend address, Wi-Fi, token,
       CA, clock and the enrolled lab targets. The Wi-Fi password is ALWAYS typed at the prompt of the
       provisioning tool; it never goes on a command line, into a log or into this window's history.
+   6. Seeds the demo data for the module tiles (`oyster seed-demo`): this PC as a read-only host and the Desk profile.
 
   The Cardputer's Wi-Fi is 2.4 GHz only. The serial port is opened with DTR/RTS off, so it cannot reset the chip.
 
@@ -205,6 +206,10 @@ if ($DryRun) {
 if (-not $Ssid) { throw 'An SSID is required.' }
 & (Join-Path $PSScriptRoot 'provision.ps1') -Port $Port --id $DeviceId --ssid $Ssid
 if ($LASTEXITCODE -ne 0) { throw "Provisioning failed (exit code $LASTEXITCODE). Nothing else was changed." }
+
+# The Hosts and Control Deck tiles need something to show: this PC as a read-only host and the Desk profile.
+Write-OysterStep 'Seeding this PC as a host and the Desk profile for the device'
+Invoke-Native -FilePath $OysterCli -ArgumentList @('seed-demo', '--id', $DeviceId) -WorkingDirectory $OysterBackendDir
 
 Write-OysterStep 'Done'
 Write-OysterNote 'The device restarts. Press any key on its start screen. The Home heading should read OYSTER OS (no "setup!")'

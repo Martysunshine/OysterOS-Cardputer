@@ -239,7 +239,7 @@ network work runs on the worker task, the UI never blocks. Not run on a real dev
 
 | Page | Screen | Content and keys |
 | --- | --- | --- |
-| Profiles | D10 | Rows: the profiles bound to this device (`GET /v1/deck/profiles?limit=5`, `next_after` paging with "More profiles..." and "Previous profiles" rows), then "History". Enter opens, `r` reloads. A reserved spot for a later "Claude Code" row is marked by a comment in `row_kind()`; nothing is offered for it. |
+| Profiles | D10 | Rows: the profiles bound to this device (`GET /v1/deck/profiles?limit=5`, `next_after` paging with "More profiles..." and "Previous profiles" rows), then "History". Enter opens, `r` reloads. The "Claude Code" row sits after the profiles (see "Claude Code row"). |
 | Slots | D11 | `1  Label` per slot, `*` after the number marks an impactful slot (it asks first). Keys `1`-`9` or Enter run the slot at once. |
 | Working | | "Sending to the backend...". Back stops waiting (the action may still run: see History). |
 | Confirm | D20 | Operation = slot label, target = host (`this-pc` shown as "this PC"), effect = what the impactful steps do. Enter approves, Back or the emergency cancel rejects, running out of the window (the backend's 120 s minus 3 s) rejects. The UI ignores keys for the first 700 ms. |
@@ -267,6 +267,35 @@ Rules the device follows:
 - **Home tile**: "N profiles" / "no profile" / "offline"; "checking..." until the first answer and "error" when
   the backend refused the list. The tile fetches the first page once in the background when Home is drawn, and
   retries on a later look at Home only after 30 s and only if that failed.
+
+## Claude Code row (`deck.cpp`, `oyster_core/claude_json.*`)
+
+Answer "may Claude Code run this tool?" from the Cardputer and read a one-line usage status. Backend contract:
+`docs/CLAUDE_CODE_LINK.md`. **Status: compiles and is host-tested against a scripted fake backend
+(`firmware/test/test_claude/`). Not run on a Cardputer, not run against the real backend routes, never against a
+live Claude Code session.**
+
+| Page | Content and keys |
+| --- | --- |
+| First page, row `Claude Code  <state>` | After the profiles. State: `N pending`, `none pending`, `checking...`, `offline` (no network or no answer), `not set up` (404: a backend without the link), `not accepted` (401/403), `error` (other or unreadable reply). Read once when the module opens and again on `r`; never on a redraw. The row is offered once the profile list or the approvals list was read, so a device with no profile still has it. Enter opens the approvals page, `s` the usage page. |
+| Approvals | Up to 5 rows `tool summary` clipped to the row, remaining seconds at the right (counted down locally from `expires_in_s`, in backend order = newest first); with none pending a note row ("No requests pending", or why the list is unavailable); last row: the usage line, e.g. `Usage Opus $0.0123 ctx 8%`. Enter on a request opens Confirm, on the usage row the usage page. `r` refreshes, `s` opens usage. The page asks again every 3 s (usage every 15 s) **only while it is open**: the module's `tick` is only called for the module on screen, so Home, Help and other modules cause no polling. A request whose window closed disappears at once. The selection restarts when the set of pending requests changes, so Enter never lands on a request that moved. |
+| Confirm | Operation `Claude Code: <tool>`, target `Details shortened`, effect = the summary (an empty one shows `(no details)`), followed by `Allow once. Deny what you cannot judge.` when rows are left. The confirm widget shows the target on one row only, so the summary is in the effect field (three wrapped rows; if word wrap would need a fourth, it is cut at the row width so all 80 characters stay visible). Enter = allow once, Back, the emergency cancel and Home = deny. The UI ignores keys for the first 700 ms. When the window closes the page becomes "Expired" and nothing is sent. |
+| Result | `Allowed` / `Denied` (the answer was recorded on the backend; for allow: Claude Code may still ask or refuse by its own rules), or a plain failure: `Too late` (409 expired), `Already answered` (409), `Rejected` (403 stale code, 401), `No longer there` (404), `Rate limit` (429, "Wait N s"), `Not sent` (offline, clock not set, radio busy, worker queue full) and `Status unknown` (no usable answer). |
+| Usage | Text page from `GET /v1/claude/status`: model, cost (labelled estimate), context %, the two plan percentages **only when present**, age (kept counting between refreshes), or "No Claude Code status received yet (see docs/CLAUDE_CODE_LINK.md)". Refreshes every 10 s and on `r`. |
+
+Rules the device follows:
+
+- **One answer per press, never retried.** `POST /v1/claude/approvals/{id}/decide` with the nonce made for this
+  device and approval, `idempotent=false`, no key. If the reply is lost (or unreadable) the page says "Status
+  unknown", the answer is not sent again, and the request stays in the list until a refresh says otherwise.
+- **The nonce** lives in module RAM only, is never shown or logged, is wiped when used, when the page closes, and
+  when the module is entered again; the worker's reply scratch is wiped after every call.
+- **Honest limits on screen:** the device sees at most 80 characters of a command, so the Confirm page says
+  "Details shortened" and advises denying what you cannot judge.
+- **Memory:** state 1696 bytes plus 3072 bytes of worker scratch (one static reply buffer instead of a heap
+  block per refresh). No new tasks or timers.
+- Unverified: the key feel and layout on the real 240x135 screen, behaviour against the real backend, TLS
+  timing of the extra calls, and everything that happens inside Claude Code after the answer.
 
 ## Audit and history (`audit.py`)
 

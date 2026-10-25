@@ -13,6 +13,12 @@
 // once used. Threading: view/select/key/back/tick/cancel run on the UI task, call() on the worker; shared state
 // is guarded with modules::Guard and never held across HTTP. A late answer of an abandoned request is dropped by
 // a generation tag carried in the request argument.
+//
+// Claude Code row (docs/CLAUDE_CODE_LINK.md, docs/CONTROL_DECK.md "Claude Code row"): the first page has one more
+// row after the profiles. It leads to the pending "may Claude Code run this tool?" requests (GET
+// /v1/claude/approvals, refreshed every 3 s while that page is open, never while another page or module is
+// open), a Confirm page per request (Enter = allow once, Back = deny; POST .../decide, sent once, never
+// retried) and a usage page (GET /v1/claude/status). Its nonces live in RAM only and are wiped when used.
 #include <Arduino.h>
 #include <esp_system.h>
 
@@ -22,14 +28,19 @@
 #include <new>
 
 #include "modules.h"
+#include "oyster_core/claude_json.h"
 #include "oyster_core/deck_json.h"
 
 namespace oyster::modules {
 namespace {
 
 namespace dk = oyster::deck;
+namespace cl = oyster::claude;
 
-enum class Page : uint8_t { Profiles = 1, Slots, Working, Confirm, Result, History };
+enum class Page : uint8_t {
+  Profiles = 1, Slots, Working, Confirm, Result, History,
+  ClaudeList, ClaudeConfirm, ClaudeResult, ClaudeStatus,  // the Claude Code row
+};
 // What the Result page shows.
 enum class Kind : uint8_t {
   Loading,     // opening a job from History: asking the backend
@@ -41,7 +52,10 @@ enum class Kind : uint8_t {
   CheckLater,  // lost contact with a job in flight: Enter asks the backend again
 };
 enum class Load : uint8_t { Idle, Loading, Ready, Failed };
-enum Call : uint8_t { kCallProfiles = 1, kCallRun = 2, kCallConfirm = 3, kCallCancel = 4, kCallPoll = 5, kCallHistory = 6 };
+enum Call : uint8_t {
+  kCallProfiles = 1, kCallRun = 2, kCallConfirm = 3, kCallCancel = 4, kCallPoll = 5, kCallHistory = 6,
+  kCallClaudeList = 7, kCallClaudeStatus = 8, kCallClaudeDecide = 9,
+};
 
 constexpr uint8_t kMaxListPages = 8;       // 8 pages of 5 profiles; the backend holds at most 32
 constexpr uint32_t kNetTimeoutMs = 35000;  // a request that never reported back is given up on
@@ -50,6 +64,10 @@ constexpr uint16_t kMaxPolls = 100;        // about 2.5 minutes, longer than any
 constexpr uint8_t kMaxPollFailures = 3;
 constexpr uint32_t kBackgroundRetryMs = 30000;
 constexpr size_t kRespCap = 5120;          // the backend client buffer is 5 KiB; replies are < 4 KiB
+constexpr uint32_t kClaudeRefreshMs = 3000;      // approvals page: how often the list is asked again
+constexpr uint32_t kClaudeStatusMs = 15000;      // approvals page: usage line, a slower cadence
+constexpr uint32_t kClaudeStatusPageMs = 10000;  // usage page
+constexpr size_t kClaudeResp = 2048;             // approvals reply is <= about 1.7 KiB (5 items, escaped summaries)
 
 struct Act {  // the job a confirm/cancel request is about, fixed when the key is pressed
   char id[dk::kTokenCap];
@@ -111,6 +129,56 @@ struct Work {  // heap, per request: the reply and what it was parsed into
   char path[112];
   char body[200];
 };
+
+// ---- Claude Code row: state (about 1.7 KiB) and the worker's scratch -----------------------------------------
+
+enum class CRes : uint8_t { None, Sending, Shown };  // what the ClaudeResult page shows
+
+struct ClaudeState {
+  cl::ApprovalPage list;                    // the last answer; an item is dropped when its window closes
+  uint32_t deadline_ms[cl::kMaxApprovals];  // local end of each item's window
+  uint32_t list_sig;                        // hash of the ids shown: changes when the set of requests changes
+  Load list_load;
+  bool have_list;
+  int list_code;                            // HTTP status or transport code of the last failed fetch
+  uint8_t list_serial;
+  uint8_t list_gen;                         // follows list_sig: the selection restarts when the requests change
+  uint32_t list_try_ms;
+
+  cl::Status status;
+  Load status_load;
+  bool have_status;
+  int status_code;
+  uint8_t status_serial;
+  uint32_t status_try_ms;
+  uint32_t status_got_ms;                   // when the reply arrived: its age is counted from here
+  Page status_from;
+
+  cl::Approval cur;                         // the request on the confirm page: a copy, refreshes do not move it
+  uint32_t cur_deadline_ms;
+  bool answered;                            // an answer for `cur` was started
+  uint32_t shown_sec;
+  char act_id[cl::kIdCap];                  // what the decide request is about, fixed when the key is pressed
+  char act_nonce[cl::kNonceCap];
+  bool act_allow;
+  uint8_t flow;                             // generation of the answer in flight; older replies are dropped
+  CRes res;
+  char res_title[32];
+  char res_body[200];
+};
+
+ClaudeState cs;
+
+// Worker task only (one request at a time): a static buffer instead of a heap block per refresh.
+struct ClaudeWork {
+  char resp[kClaudeResp];
+  union {
+    cl::ApprovalPage page;
+    cl::Status status;
+    cl::DecideReply reply;
+  } out;
+};
+ClaudeWork s_cw;
 
 // ---- small helpers ---------------------------------------------------------------------------------
 
@@ -181,6 +249,170 @@ void short_error(int status, char* out, size_t n) {
     return;
   }
   copy_text(out, n, t);
+}
+
+// ---- Claude Code row: helpers (Guard held) ---------------------------------------------------------
+
+uint32_t claude_signature() {  // FNV-1a over the ids, in order
+  uint32_t h = 2166136261u;
+  for (uint8_t i = 0; i < cs.list.count; ++i) {
+    for (const char* p = cs.list.items[i].id; *p != '\0'; ++p) h = (h ^ static_cast<uint8_t>(*p)) * 16777619u;
+    h = (h ^ 0xFFu) * 16777619u;
+  }
+  return h;
+}
+
+// The set of requests may have changed: the selection restarts, so Enter never lands on a request that moved.
+void claude_list_changed() {
+  const uint32_t sig = claude_signature();
+  if (sig != cs.list_sig) {
+    cs.list_sig = sig;
+    ++cs.list_gen;
+  }
+}
+
+void claude_drop_item(uint8_t i) {
+  if (i >= cs.list.count) return;
+  for (uint8_t k = i; k + 1 < cs.list.count; ++k) {
+    cs.list.items[k] = cs.list.items[k + 1];
+    cs.deadline_ms[k] = cs.deadline_ms[k + 1];
+  }
+  const uint8_t last = static_cast<uint8_t>(cs.list.count - 1);
+  wipe(&cs.list.items[last], sizeof(cs.list.items[last]));  // carried a nonce
+  cs.deadline_ms[last] = 0;
+  --cs.list.count;
+}
+
+void claude_drop_id(const char* id) {
+  for (uint8_t i = 0; i < cs.list.count; ++i) {
+    if (std::strcmp(cs.list.items[i].id, id) == 0) {
+      claude_drop_item(i);
+      claude_list_changed();
+      return;
+    }
+  }
+}
+
+// Drops the requests whose window has closed. True when one went.
+bool claude_expire_items(uint32_t now) {
+  bool any = false;
+  for (uint8_t i = 0; i < cs.list.count;) {
+    if (cl::deadline_passed(now, cs.deadline_ms[i])) {
+      claude_drop_item(i);
+      any = true;
+    } else {
+      ++i;
+    }
+  }
+  if (any) claude_list_changed();
+  return any;
+}
+
+// The row is offered once the profile list or the approvals list has been read at least once, so a device
+// without any profile still reaches it.
+bool claude_row_visible() { return s.have_profiles || cs.have_list; }
+
+cl::EntryState claude_entry_state() {
+  if (cs.have_list) return cl::EntryState::Pending;
+  if (cs.list_load == Load::Failed) return cl::entry_state_for_failure(cs.list_code);
+  return cl::EntryState::Checking;
+}
+
+void claude_start_list() {
+  if (cs.list_load == Load::Loading) return;
+  ++cs.list_serial;
+  cs.list_load = Load::Loading;
+  cs.list_try_ms = millis();
+  if (!enqueue(kCallClaudeList, cs.list_serial, nullptr)) {
+    cs.list_load = Load::Failed;
+    cs.list_code = kHttpRadioBusy;
+  }
+}
+
+void claude_start_status() {
+  if (cs.status_load == Load::Loading) return;
+  ++cs.status_serial;
+  cs.status_load = Load::Loading;
+  cs.status_try_ms = millis();
+  if (!enqueue(kCallClaudeStatus, cs.status_serial, nullptr)) {
+    cs.status_load = Load::Failed;
+    cs.status_code = kHttpRadioBusy;
+  }
+}
+
+// Entering the module: nothing of an earlier visit is kept (no nonce, no old request); replies still on their
+// way are dropped by their tags.
+void claude_reset() {
+  const uint8_t list_serial = static_cast<uint8_t>(cs.list_serial + 1);
+  const uint8_t status_serial = static_cast<uint8_t>(cs.status_serial + 1);
+  const uint8_t flow = static_cast<uint8_t>(cs.flow + 1);
+  const uint8_t gen = static_cast<uint8_t>(cs.list_gen + 1);
+  wipe(&cs, sizeof(cs));
+  cs.list_serial = list_serial;
+  cs.status_serial = status_serial;
+  cs.flow = flow;
+  cs.list_gen = gen;
+  cs.status_from = Page::Profiles;
+}
+
+void claude_open_list() {
+  s.page = Page::ClaudeList;
+  cs.shown_sec = 0xFFFFFFFFu;
+  claude_start_list();
+  if (!cs.have_status || due(millis(), cs.status_try_ms + kClaudeStatusMs)) claude_start_status();
+}
+
+void claude_open_status(Page from) {
+  cs.status_from = from;
+  s.page = Page::ClaudeStatus;
+  claude_start_status();
+}
+
+void claude_open_confirm(uint8_t i) {
+  if (i >= cs.list.count) return;
+  if (cl::deadline_passed(millis(), cs.deadline_ms[i])) {
+    claude_expire_items(millis());
+    toast("Expired");
+    return;
+  }
+  std::memcpy(&cs.cur, &cs.list.items[i], sizeof(cs.cur));
+  cs.cur_deadline_ms = cs.deadline_ms[i];
+  cs.answered = false;
+  cs.shown_sec = 0xFFFFFFFFu;
+  wipe(cs.act_nonce, sizeof(cs.act_nonce));
+  s.page = Page::ClaudeConfirm;
+}
+
+// Enter (allow) or Back / emergency cancel (deny) on the confirm page. The answer is sent once and never
+// retried; the nonce goes into the request and is wiped here and in the worker.
+void claude_answer(bool allow) {
+  if (s.page != Page::ClaudeConfirm || cs.answered) return;
+  cs.answered = true;
+  copy_text(cs.act_id, sizeof(cs.act_id), cs.cur.id);
+  copy_text(cs.act_nonce, sizeof(cs.act_nonce), cs.cur.nonce);
+  wipe(cs.cur.nonce, sizeof(cs.cur.nonce));
+  cs.act_allow = allow;
+  ++cs.flow;
+  cs.res = CRes::Sending;
+  s.page = Page::ClaudeResult;
+  if (!enqueue(kCallClaudeDecide, cs.flow, allow ? "a" : "d")) {
+    wipe(cs.act_nonce, sizeof(cs.act_nonce));
+    dk::ApiError none;
+    std::memset(&none, 0, sizeof(none));
+    cl::format_failure(cl::FailureKind::NotSent, cl::kStatusBuildFailed, none, cs.cur.tool, cs.res_title,
+                       sizeof(cs.res_title), cs.res_body, sizeof(cs.res_body));
+    cs.res = CRes::Shown;
+  }
+}
+
+// The window of the open request closed before it was answered: nothing is sent.
+void claude_expire_confirm() {
+  cs.answered = true;
+  wipe(cs.cur.nonce, sizeof(cs.cur.nonce));
+  claude_drop_id(cs.cur.id);
+  cl::format_expired(cs.cur.tool, cs.res_title, sizeof(cs.res_title), cs.res_body, sizeof(cs.res_body));
+  cs.res = CRes::Shown;
+  s.page = Page::ClaudeResult;
 }
 
 // ---- list fetches (Guard held) ---------------------------------------------------------------------
@@ -329,6 +561,24 @@ void give_up_waiting() {
   if (s.hist_load == Load::Loading) {
     s.hist_load = Load::Failed;
     copy_text(s.hist_error, sizeof(s.hist_error), "No answer. r:Retry");
+  }
+  ++cs.list_serial;
+  ++cs.status_serial;
+  if (cs.list_load == Load::Loading) {
+    cs.list_load = Load::Failed;
+    cs.list_code = -3;
+  }
+  if (cs.status_load == Load::Loading) {
+    cs.status_load = Load::Failed;
+    cs.status_code = -3;
+  }
+  if (s.page == Page::ClaudeResult && cs.res == CRes::Sending) {
+    ++cs.flow;  // a late reply is dropped; the answer is NOT sent again
+    dk::ApiError none;
+    std::memset(&none, 0, sizeof(none));
+    cl::format_failure(cl::FailureKind::Unknown, -3, none, cs.cur.tool, cs.res_title, sizeof(cs.res_title),
+                       cs.res_body, sizeof(cs.res_body));
+    cs.res = CRes::Shown;
   }
   switch (s.page) {
     case Page::Working:
@@ -597,6 +847,131 @@ void do_poll(const char* arg) {
   delete w;
 }
 
+// ---- worker side, Claude Code row ---------------------------------------------------------------------------
+// One static scratch (s_cw) serves all three calls: the worker runs one request at a time. What it held (the
+// reply carries nonces) is wiped before the call returns.
+
+void do_claude_list(const char* arg) {
+  uint8_t serial = 0;
+  const char* rest = nullptr;
+  if (!split_arg(arg, &serial, &rest)) return;
+  ClaudeWork& w = s_cw;
+  const uint32_t sent_ms = millis();  // the windows are counted from before the request: never longer than real
+  size_t n = 0;
+  const int st = http("GET", cl::kPathApprovals, nullptr, 0, w.resp, sizeof(w.resp), &n, true, nullptr);
+  const bool parsed = st == 200 && cl::parse_approvals(w.resp, n, w.out.page);
+  {
+    Guard g;
+    if (serial == cs.list_serial) {
+      if (parsed) {
+        std::memcpy(&cs.list, &w.out.page, sizeof(cs.list));
+        for (uint8_t i = 0; i < cs.list.count; ++i) {
+          cs.deadline_ms[i] = cl::deadline_from(sent_ms, cs.list.items[i].expires_in_s);
+        }
+        cs.have_list = true;
+        cs.list_load = Load::Ready;
+        cs.list_code = 0;
+        claude_expire_items(millis());
+        claude_list_changed();
+      } else {
+        cs.list_load = Load::Failed;
+        cs.list_code = st == 200 ? -4 : st;  // an unreadable 200 is a protocol problem
+      }
+    }
+  }
+  wipe(w.resp, sizeof(w.resp));
+  wipe(&w.out, sizeof(w.out));
+}
+
+void do_claude_status(const char* arg) {
+  uint8_t serial = 0;
+  const char* rest = nullptr;
+  if (!split_arg(arg, &serial, &rest)) return;
+  ClaudeWork& w = s_cw;
+  size_t n = 0;
+  const int st = http("GET", cl::kPathStatus, nullptr, 0, w.resp, sizeof(w.resp), &n, true, nullptr);
+  const bool parsed = st == 200 && cl::parse_status(w.resp, n, w.out.status);
+  {
+    Guard g;
+    if (serial == cs.status_serial) {
+      if (parsed) {
+        std::memcpy(&cs.status, &w.out.status, sizeof(cs.status));
+        cs.have_status = true;
+        cs.status_load = Load::Ready;
+        cs.status_code = 0;
+        cs.status_got_ms = millis();
+      } else {
+        cs.status_load = Load::Failed;
+        cs.status_code = st == 200 ? -4 : st;
+      }
+    }
+  }
+  wipe(w.resp, sizeof(w.resp));
+  wipe(&w.out, sizeof(w.out));
+}
+
+// The answer to one request, sent once: never retried by the client (idempotent=false) and never again by the
+// module, whatever comes back.
+void do_claude_decide(const char* arg) {
+  uint8_t tag = 0;
+  const char* rest = nullptr;
+  if (!split_arg(arg, &tag, &rest)) return;
+  const bool allow = rest[0] == 'a';
+  char id[cl::kIdCap];
+  char nonce[cl::kNonceCap];
+  char tool[cl::kToolCap];
+  {
+    Guard g;
+    copy_text(id, sizeof(id), cs.act_id);
+    copy_text(nonce, sizeof(nonce), cs.act_nonce);
+    copy_text(tool, sizeof(tool), cs.cur.tool);
+    wipe(cs.act_nonce, sizeof(cs.act_nonce));
+  }
+  ClaudeWork& w = s_cw;
+  char path[96];
+  char body[96];
+  int st = cl::kStatusBuildFailed;  // nothing is sent when the path or body cannot be built
+  size_t n = 0;
+  if (cl::path_decide(path, sizeof(path), id) && cl::body_decide(body, sizeof(body), allow, nonce)) {
+    st = http("POST", path, body, std::strlen(body), w.resp, sizeof(w.resp), &n, false, nullptr);
+  }
+  wipe(body, sizeof(body));
+  wipe(nonce, sizeof(nonce));
+
+  const bool parsed = st == 200 && cl::parse_decide_reply(w.resp, n, w.out.reply) &&
+                      (w.out.reply.approval_id[0] == '\0' || std::strcmp(w.out.reply.approval_id, id) == 0);
+  dk::ApiError err;
+  std::memset(&err, 0, sizeof(err));
+  if (st > 0 && st != 200) dk::parse_api_error(w.resp, n, err);
+  char title[sizeof(cs.res_title)];
+  char text[sizeof(cs.res_body)];
+  cl::FailureKind kind = cl::FailureKind::Unknown;
+  if (parsed) {
+    cl::format_answer_ok(w.out.reply.state == cl::Decided::Allowed, tool, title, sizeof(title), text, sizeof(text));
+  } else {
+    kind = cl::classify_failure(st, err);
+    cl::format_failure(kind, st, err, tool, title, sizeof(title), text, sizeof(text));
+  }
+  // The request is no longer pending when the backend recorded the answer or said it is gone / closed.
+  const bool settled = parsed || kind == cl::FailureKind::TooLate || kind == cl::FailureKind::AlreadyAnswered ||
+                       kind == cl::FailureKind::Gone;
+  {
+    Guard g;
+    if (settled) claude_drop_id(id);
+    if (tag == cs.flow && cs.res == CRes::Sending) {
+      copy_text(cs.res_title, sizeof(cs.res_title), title);
+      copy_text(cs.res_body, sizeof(cs.res_body), text);
+      cs.res = CRes::Shown;
+    } else {
+      char note[40];  // the page was left meanwhile: say how it ended
+      std::snprintf(note, sizeof(note), "Claude Code: %s", title[0] == '!' ? title + 1 : title);
+      toast(note);
+    }
+  }
+  wipe(w.resp, sizeof(w.resp));
+  wipe(&w.out, sizeof(w.out));
+}
+
 void call(uint8_t call_id, const char* arg) {
   switch (call_id) {
     case kCallProfiles: do_profiles(arg); break;
@@ -605,6 +980,9 @@ void call(uint8_t call_id, const char* arg) {
     case kCallCancel: do_cancel(arg); break;
     case kCallPoll: do_poll(arg); break;
     case kCallHistory: do_history(arg); break;
+    case kCallClaudeList: do_claude_list(arg); break;
+    case kCallClaudeStatus: do_claude_status(arg); break;
+    case kCallClaudeDecide: do_claude_decide(arg); break;
     default: break;
   }
   call_done();  // exactly once per request: clears "working" and redraws
@@ -617,24 +995,32 @@ bool available(const char** why) {
   return true;  // an unreachable backend is explained on the page itself
 }
 
-enum class RowKind : uint8_t { Profile, More, Prev, History, None };
+enum class RowKind : uint8_t { Profile, Claude, More, Prev, History, None };
 
 bool has_more() { return s.profiles.next_after[0] != '\0' && s.page_idx + 1 < kMaxListPages; }
 
+// Rows of the first page: the profiles, the Claude Code row, then "More profiles...", "Previous profiles" and
+// "History" (those three only when there is a profile).
 uint16_t profile_rows() {
-  if (!s.have_profiles || s.profiles.count == 0) return 0;
-  return static_cast<uint16_t>(s.profiles.count + (has_more() ? 1 : 0) + (s.page_idx > 0 ? 1 : 0) + 1);
+  const uint16_t n = s.have_profiles ? s.profiles.count : 0;
+  uint16_t rows = n;
+  if (claude_row_visible()) ++rows;
+  if (n > 0) rows = static_cast<uint16_t>(rows + (has_more() ? 1 : 0) + (s.page_idx > 0 ? 1 : 0) + 1);
+  return rows;
 }
 
 RowKind row_kind(uint16_t i, uint16_t* index) {
-  // Hook for a later "Claude Code" row: it becomes the first entry of this page, ahead of the profiles. Shift `i`
-  // by one here, add one to profile_rows(), and handle the row in select(). Not built: nothing is offered for it.
-  const uint16_t n = s.profiles.count;
+  const uint16_t n = s.have_profiles ? s.profiles.count : 0;
   if (i < n) {
     *index = i;
     return RowKind::Profile;
   }
   i = static_cast<uint16_t>(i - n);
+  if (claude_row_visible()) {
+    if (i == 0) return RowKind::Claude;
+    --i;
+  }
+  if (n == 0) return RowKind::None;
   if (has_more()) {
     if (i == 0) return RowKind::More;
     --i;
@@ -651,6 +1037,7 @@ void row_profiles(uint16_t i, char* out, size_t n) {
   uint16_t index = 0;
   switch (row_kind(i, &index)) {
     case RowKind::Profile: dk::format_profile_row(s.profiles.profiles[index], out, n); break;
+    case RowKind::Claude: cl::format_entry_row(claude_entry_state(), cs.list.count, out, n); break;
     case RowKind::More: copy_text(out, n, "More profiles..."); break;
     case RowKind::Prev: copy_text(out, n, "Previous profiles"); break;
     case RowKind::History: copy_text(out, n, "History"); break;
@@ -697,6 +1084,103 @@ void view_profiles(PageView& v) {
     copy_text(v.right, sizeof(v.right), "stale");
   } else if (s.page_idx > 0) {
     std::snprintf(v.right, sizeof(v.right), "pg %u", static_cast<unsigned>(s.page_idx) + 1);
+  } else if (v.count > 0 && (!s.have_profiles || s.profiles.count == 0)) {
+    // only the Claude Code row is offered: say why there is nothing else
+    copy_text(v.right, sizeof(v.right), s.have_profiles ? "no profile" : "no profiles yet");
+  }
+}
+
+// ---- Claude Code row: pages -----------------------------------------------------------------------------
+
+void claude_usage_row(char* out, size_t n) {
+  if (cs.have_status) {
+    cl::format_usage_line(cs.status, out, n);
+  } else if (cs.status_load == Load::Failed) {
+    copy_text(out, n, "Usage: not available");
+  } else {
+    copy_text(out, n, "Usage: checking...");
+  }
+}
+
+// Rows of the approvals page: the pending requests (or one note when there are none), then the usage line.
+uint8_t claude_pending_count() { return cs.have_list ? cs.list.count : 0; }
+
+uint16_t claude_list_rows() {
+  const uint8_t n = claude_pending_count();
+  return static_cast<uint16_t>((n == 0 ? 1 : n) + 1);
+}
+
+void row_claude(uint16_t i, char* out, size_t n) {
+  Guard g;
+  const uint8_t pending = claude_pending_count();
+  if (pending == 0 && i == 0) {
+    cl::format_list_note(claude_entry_state(), 0, out, n);
+  } else if (i < pending) {
+    const uint32_t left = cl::seconds_left(millis(), cs.deadline_ms[i]);
+    cl::format_approval_row(cs.list.items[i], left, out, n);
+  } else {
+    claude_usage_row(out, n);
+  }
+}
+
+void view_claude_list(PageView& v) {
+  v.kind = PageKind::List;
+  v.page_id = static_cast<uint8_t>(static_cast<uint8_t>(Page::ClaudeList) | ((cs.list_gen & 7u) << 4));
+  copy_text(v.title, sizeof(v.title), "Claude Code");
+  v.count = claude_list_rows();
+  v.row = row_claude;
+  copy_text(v.left, sizeof(v.left), "Ent:Open s:Usage r:Refresh");
+  if (cs.list_load == Load::Failed && cs.have_list) copy_text(v.right, sizeof(v.right), "stale");
+}
+
+void view_claude_confirm(PageView& v) {
+  v.kind = PageKind::Confirm;
+  v.page_id = static_cast<uint8_t>(Page::ClaudeConfirm);
+  copy_text(v.title, sizeof(v.title), "CONFIRM ACTION");
+  cl::format_confirm_operation(cs.cur.tool, v.confirm_operation, sizeof(v.confirm_operation));
+  cl::format_confirm_target(v.confirm_target, sizeof(v.confirm_target));
+  cl::format_confirm_effect(cs.cur.summary, v.confirm_effect, sizeof(v.confirm_effect));
+  copy_text(v.left, sizeof(v.left), "Ent:Allow once Del:Deny");
+  std::snprintf(v.right, sizeof(v.right), "%lus",
+                static_cast<unsigned long>(cl::seconds_left(millis(), cs.cur_deadline_ms)));
+}
+
+void view_claude_result(PageView& v) {
+  v.kind = PageKind::Text;
+  v.page_id = static_cast<uint8_t>(Page::ClaudeResult);
+  if (cs.res == CRes::Sending) {
+    copy_text(v.title, sizeof(v.title), "Sending answer");
+    std::snprintf(v.body, sizeof(v.body),
+                  "Claude Code: %s\nSending your answer to the backend...\nNothing is assumed until it answers.",
+                  cs.cur.tool[0] != '\0' ? cs.cur.tool : "?");
+    copy_text(v.left, sizeof(v.left), "Working... Del:Back");
+  } else {
+    copy_text(v.title, sizeof(v.title), cs.res_title);
+    copy_text(v.body, sizeof(v.body), cs.res_body);
+    copy_text(v.left, sizeof(v.left), "Del:Back ;.:Scroll");
+  }
+}
+
+void view_claude_status(PageView& v) {
+  v.kind = PageKind::Text;
+  v.page_id = static_cast<uint8_t>(Page::ClaudeStatus);
+  copy_text(v.title, sizeof(v.title), "Claude Code usage");
+  copy_text(v.left, sizeof(v.left), "r:Refresh Del:Back");
+  if (cs.have_status) {
+    const uint32_t since_s = (millis() - cs.status_got_ms) / 1000u;
+    cl::format_status_body(cs.status, cs.status.updated_s_ago + since_s, v.body, sizeof(v.body));
+    if (cs.status_load == Load::Failed) {  // the numbers above are older than the last try
+      char note[40];
+      cl::format_list_note(cl::entry_state_for_failure(cs.status_code), 0, note, sizeof(note));
+      const size_t len = std::strlen(v.body);
+      std::snprintf(v.body + len, sizeof(v.body) - len, "\nRefresh failed: %s", note);
+    }
+  } else if (cs.status_load == Load::Failed) {
+    char note[40];
+    cl::format_list_note(cl::entry_state_for_failure(cs.status_code), 0, note, sizeof(note));
+    std::snprintf(v.body, sizeof(v.body), "Could not read the usage line.\n%s", note);
+  } else {
+    copy_text(v.body, sizeof(v.body), "Asking the backend...");
   }
 }
 
@@ -810,9 +1294,15 @@ void view(PageView& v) {
     case Page::Confirm: view_confirm(v); break;
     case Page::Result: view_result(v); break;
     case Page::History: view_history(v); break;
+    case Page::ClaudeList: view_claude_list(v); break;
+    case Page::ClaudeConfirm: view_claude_confirm(v); break;
+    case Page::ClaudeResult: view_claude_result(v); break;
+    case Page::ClaudeStatus: view_claude_status(v); break;
   }
-  const bool polling_only = s.page == Page::Result && s.kind == Kind::Job;  // periodic status polls are not "working"
-  v.busy = s.inflight > 0 && !polling_only;
+  // Periodic refreshes (job status, the approvals page) are not "working"; only an answer on its way is.
+  const bool quiet = (s.page == Page::Result && s.kind == Kind::Job) || s.page == Page::ClaudeList ||
+                     s.page == Page::ClaudeStatus || s.page == Page::ClaudeConfirm;
+  v.busy = s.inflight > 0 && !quiet;
 }
 
 void open_history_job(uint16_t row) {
@@ -847,6 +1337,7 @@ void select(uint16_t row) {
           break;
         case RowKind::More: start_list_fetch(static_cast<uint8_t>(s.page_idx + 1)); break;
         case RowKind::Prev: start_list_fetch(static_cast<uint8_t>(s.page_idx - 1)); break;
+        case RowKind::Claude: claude_open_list(); break;
         case RowKind::History:
           s.page = Page::History;
           start_hist_fetch();
@@ -870,12 +1361,38 @@ void select(uint16_t row) {
       }
       break;
     case Page::History: open_history_job(row); break;
+    case Page::ClaudeList: {
+      const uint8_t pending = claude_pending_count();
+      if (pending == 0) {
+        if (row > 0) claude_open_status(Page::ClaudeList);  // row 0 is only the note "No requests pending"
+      } else if (row < pending) {
+        claude_open_confirm(static_cast<uint8_t>(row));
+      } else {
+        claude_open_status(Page::ClaudeList);
+      }
+      break;
+    }
+    case Page::ClaudeConfirm: claude_answer(true); break;
+    case Page::ClaudeResult:
+    case Page::ClaudeStatus: break;
   }
 }
 
 bool back() {
   Guard g;
   switch (s.page) {
+    case Page::ClaudeList: s.page = Page::Profiles; return true;
+    case Page::ClaudeStatus: s.page = cs.status_from; return true;
+    case Page::ClaudeConfirm: claude_answer(false); return true;
+    case Page::ClaudeResult:
+      if (cs.res == CRes::Sending) {
+        ++cs.flow;  // the reply is dropped; it is not sent again
+        toast("Answer may still arrive: open the list");
+      }
+      s.page = Page::ClaudeList;
+      cs.shown_sec = 0xFFFFFFFFu;
+      claude_start_list();
+      return true;
     case Page::Profiles: return false;  // leave the module
     case Page::Slots:
     case Page::History: s.page = Page::Profiles; return true;
@@ -896,13 +1413,27 @@ bool key(NavEvent e, char c) {
     start_run(static_cast<uint8_t>(c - '0'));
     return true;
   }
+  if ((c == 's' || c == 'S') && ((s.page == Page::Profiles && claude_row_visible()) || s.page == Page::ClaudeList)) {
+    claude_open_status(s.page);
+    return true;
+  }
   if (c == 'r' || c == 'R') {
     if (s.page == Page::Profiles) {
       start_list_fetch(s.page_idx);
+      claude_start_list();  // the Claude Code row is read again with the profiles
       return true;
     }
     if (s.page == Page::History) {
       start_hist_fetch();
+      return true;
+    }
+    if (s.page == Page::ClaudeList) {
+      claude_start_list();
+      claude_start_status();
+      return true;
+    }
+    if (s.page == Page::ClaudeStatus) {
+      claude_start_status();
       return true;
     }
   }
@@ -929,12 +1460,54 @@ bool tick(uint32_t now_ms) {
     }
   }
   if (s.page == Page::Result && result_is_polling() && s.inflight == 0 && due(now_ms, s.next_poll_ms)) send_poll();
+
+  // Claude Code row. tick() is only called while this module is on screen, so nothing is polled from Home, from
+  // Help or from another module. Requests whose window closed disappear here, without waiting for a refresh.
+  if (cs.have_list && claude_expire_items(now_ms)) redraw = true;
+  switch (s.page) {
+    case Page::ClaudeList: {
+      if (cs.list_load != Load::Loading && due(now_ms, cs.list_try_ms + kClaudeRefreshMs)) {
+        claude_start_list();
+      } else if (cs.status_load != Load::Loading && due(now_ms, cs.status_try_ms + kClaudeStatusMs)) {
+        claude_start_status();
+      }
+      const uint32_t sec = now_ms / 1000u;  // the remaining seconds in the rows
+      if (sec != cs.shown_sec) {
+        cs.shown_sec = sec;
+        redraw = true;
+      }
+      break;
+    }
+    case Page::ClaudeConfirm:
+      if (!cs.answered) {
+        if (cl::deadline_passed(now_ms, cs.cur_deadline_ms)) {
+          claude_expire_confirm();  // nothing is sent: the window is closed
+          redraw = true;
+        } else {
+          const uint32_t sec = cl::seconds_left(now_ms, cs.cur_deadline_ms);
+          if (sec != cs.shown_sec) {
+            cs.shown_sec = sec;
+            redraw = true;
+          }
+        }
+      }
+      break;
+    case Page::ClaudeStatus:
+      if (cs.status_load != Load::Loading && due(now_ms, cs.status_try_ms + kClaudeStatusPageMs)) {
+        claude_start_status();
+      }
+      break;
+    default:
+      break;
+  }
   return redraw;
 }
 
 void cancel() {
   Guard g;
-  if (s.page == Page::Confirm) {
+  if (s.page == Page::ClaudeConfirm) {
+    claude_answer(false);  // emergency cancel and Home answer "deny"
+  } else if (s.page == Page::Confirm) {
     reject_confirmation();
   } else if (s.page == Page::Working) {
     new_flow(Page::Slots);
@@ -949,8 +1522,11 @@ void open() {
   }
   wipe(s.act.nonce, sizeof(s.act.nonce));
   wipe(s.job.nonce, sizeof(s.job.nonce));
+  // A Claude Code request left open is not answered here: it simply expires on the PC. Nothing of it is kept.
+  claude_reset();
   new_flow(Page::Profiles);  // also drops the answer of the cancel above
   start_list_fetch(0);
+  claude_start_list();
 }
 
 void tile_status(char* out, size_t n) {
