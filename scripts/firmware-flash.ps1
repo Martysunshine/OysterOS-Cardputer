@@ -118,7 +118,24 @@ if ($SkipBackupCheck) {
 Write-OysterStep "Flashing $Port  (manual step - unverified until run)"
 Invoke-Native -FilePath $OysterPio -ArgumentList $uploadArgs -WorkingDirectory $OysterFirmwareDir
 
+# PlatformIO ends the upload with a reset over the DTR/RTS lines. With the USB-Serial/JTAG port on Windows
+# that can leave the chip in its ROM bootloader (dark screen, no program running). A watchdog reset does not
+# depend on the line state, so the device is restarted that way. Failure here is not fatal: the upload itself
+# has already been verified by esptool.
+Write-OysterStep 'Restarting the device into the new firmware'
+$resetTool = Find-OysterEsptool
+if ($resetTool -and (Wait-OysterPort -Port $Port)) {
+    $reset = Invoke-OysterEsptoolCapture -Esptool $resetTool -ArgumentList @(
+        '--chip', 'esp32s3', '--port', $Port, '--before', 'default_reset', '--after', 'watchdog_reset', 'read_mac')
+    if ($reset.ExitCode -ne 0) {
+        Write-OysterWarn 'The restart command failed. Unplug the USB cable, switch the Cardputer off, plug it in and switch it on.'
+    }
+} else {
+    Write-OysterWarn "$Port is not available for the restart. Unplug the USB cable, switch the Cardputer off, plug it in and switch it on."
+}
+
 Write-OysterStep 'Upload finished'
-Write-Host '    If the screen stays dark, switch the Cardputer off and on (needed after manual download mode).'
+Write-Host '    If the screen stays dark, unplug the USB cable, switch the Cardputer off, plug it in and switch it on.'
+Write-Host '    Do not open a serial terminal with DTR/RTS asserted: on this USB mode that can reset the chip into its bootloader.'
 Write-Host "    Watch the boot log with: .\scripts\firmware-monitor.ps1 -Port $Port"
 Write-Host '    Record what you observe in docs/HARDWARE_VERIFICATION.md.'

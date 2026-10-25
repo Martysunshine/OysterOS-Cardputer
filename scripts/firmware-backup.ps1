@@ -28,7 +28,8 @@
   The device's COM port, for example COM5 (find it with ".\.venv\Scripts\pio.exe device list").
 
 .PARAMETER Baud
-  Serial speed passed to esptool (default 460800).
+  Serial speed passed to esptool (default 115200: the native USB port ignores the rate, and switching to a
+  higher one stalled a read at 19% on the first device).
 
 .PARAMETER VerifyByReread
   Also read the whole flash a second time and require the same SHA-256 (takes about twice as long).
@@ -47,7 +48,7 @@ param(
     [string]$Port,
 
     [ValidateRange(115200, 2000000)]
-    [int]$Baud = 460800,
+    [int]$Baud = 115200,
 
     [switch]$VerifyByReread,
 

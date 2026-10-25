@@ -57,7 +57,17 @@ class SerialLink:
         if isinstance(port_or_serial, str):
             import serial  # pyserial
 
-            self._ser = serial.Serial(port_or_serial, BAUD, timeout=0.2, write_timeout=2)
+            # DTR and RTS are set before the port is opened: on the Cardputer's native USB-Serial/JTAG port
+            # an asserted DTR at open time can reset the chip into its ROM bootloader.
+            ser = serial.Serial()
+            ser.port = port_or_serial
+            ser.baudrate = BAUD
+            ser.timeout = 0.2
+            ser.write_timeout = 2
+            ser.dtr = False
+            ser.rts = False
+            ser.open()
+            self._ser = ser
         else:
             self._ser = port_or_serial
         self._echo = echo or (lambda _s: None)

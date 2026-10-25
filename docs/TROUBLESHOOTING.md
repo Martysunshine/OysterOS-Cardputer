@@ -95,13 +95,13 @@ Put the board into **download mode** manually:
 3. While holding G0, **plug in the USB-C data cable**.
 4. **Release G0.** The screen stays dark. That is normal in download mode.
 5. Run `.\scripts\firmware-flash.ps1 -Port COMx` again (check the port number first).
-6. After a successful upload, switch the device **off and on** (or unplug and replug) to start the new
-   firmware.
+6. After a successful upload the script restarts the chip with a watchdog reset. If the screen is still dark,
+   unplug the USB cable, switch the Cardputer **off**, plug it in and switch it **on** (the power switch alone
+   does not cut USB power).
 
 If it still fails, try a different cable or USB socket and make sure nothing else has the port open. As a
-last resort, lower `upload_speed` in `firmware\platformio.ini` (pinned default 921600; 460800 or 115200
-are slower but more tolerant). Treat that as a local experiment. Record it in
-[`BUILD_MATRIX.md`](BUILD_MATRIX.md) only if it becomes the new default.
+last resort, change `upload_speed` in `firmware\platformio.ini` (pinned at 115200, which is the most tolerant:
+the native USB port ignores the UART rate, and a switch to 460800 stalled a flash read on the first device).
 
 ## Restoring your own backup (esptool)
 
@@ -286,3 +286,17 @@ and then ends the run `failed`; it never invents an answer.
 - The free tier of that model has its own input-token-per-minute cap (7,000), so a run may pause 30-40 s between
   requests (see the rate-limit section above).
 
+## Screen stays dark after flashing, serial port silent, chip answers as a bootloader
+
+Symptom: the upload reports success and every hash verified, but the screen is dark and no log appears.
+`esptool --before no_reset --after no_reset read_mac` succeeds, which only a chip sitting in its ROM bootloader does.
+
+Cause: on Windows the USB-Serial/JTAG port decodes the DTR/RTS lines as reset and boot-mode signals. A reset that
+leaves GPIO0 low, or a terminal that opens the port with DTR asserted, puts the chip into download mode. The power
+switch does not help while USB power stays connected.
+
+- `firmware-flash.ps1` now finishes with a watchdog reset (`--after watchdog_reset`), which does not depend on the
+  line state. By hand: `python esptool.py --chip esp32s3 --port COMx --before default_reset --after watchdog_reset read_mac`.
+- `monitor_dtr = 0` and `monitor_rts = 0` are set for the PlatformIO monitor. In your own serial tools open the port
+  with DTR and RTS off.
+- Last resort: unplug the cable, switch the device off, plug it in, switch it on.
