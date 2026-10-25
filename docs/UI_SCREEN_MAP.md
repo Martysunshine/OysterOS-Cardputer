@@ -90,6 +90,25 @@ The first three modules are written, compiled and host-tested, and **none has ru
 | - | Boot / board mismatch / USB setup | `Boot`, `BoardError`, `Provisioning` | `g_board.info()`, `g_provisioning` | Oyster Pocket only |
 | - | Messages and sub-details | `Message`, `Detail` (Backend, Storage, Diagnostics, Keyboard, About, Last read) | builders in `app_controller.cpp` | Oyster Pocket only |
 
+## Status LED
+
+The WS2812 on the StampS3 module shows the state at a glance (brightness capped at 100/255, nothing faster
+than one blink per second; it is written only when its colour changes and never from a task or timer). The
+same table is on the device under Home > Help > Enter.
+
+| LED | Meaning |
+| --- | --- |
+| 🟢 green, slow breathing | Online: the backend is reachable |
+| 🔵 blue, breathing | Attention: a confirmation or a new AI answer waits for you |
+| 🟠 amber, one blink every 2 s | Offline: not provisioned, or the backend cannot be reached |
+| 🟠 amber, breathing | Connecting: joining Wi-Fi or reaching the backend |
+| 🔴 red, one blink every second | Error: certificate, token, clock or start-up problem |
+| 🩵 teal, breathing | Scanning: a Wi-Fi survey or a Bluetooth operation is running |
+| ⚪ white, slow breathing | Boot: the start screen, waiting for any key |
+| 🟢 green, two pulses | Announcement: an operation finished |
+| 🔴 red, two long blinks | Announcement: an operation failed |
+| 🔵 blue, three quick blinks | Announcement: a request or an answer arrived |
+
 ## Logical actions and proposed keys
 
 The **Go button (G0)** is not a keyboard action: it covers the current screen with the logo screen (`Any key:Unlock`)

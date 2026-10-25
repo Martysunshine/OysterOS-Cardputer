@@ -594,6 +594,36 @@ void draw_image(const assets::Image& img, int x, int y, uint16_t bg, bool dim) {
 
 void draw_icon(assets::IconId id, int x, int y, uint16_t bg, bool dim) { draw_image(assets::icon(id), x, y, bg, dim); }
 
+void draw_colour_table(const char* title, const ColourRow* rows, uint8_t count, uint8_t selected, uint8_t top) {
+  if (!s_ready) return;
+  char pos[16];
+  std::snprintf(pos, sizeof(pos), "%u/%u", static_cast<unsigned>(count ? selected + 1 : 0), static_cast<unsigned>(count));
+  heading(title, pos);
+  content_pads(true);
+  const Scroll sc{count, static_cast<uint32_t>(kRows), top};
+  const int dot_x = kListTextX + 6, text_x = kListTextX + 16;
+  const int cols = (kPadX + kInnerW - text_x) / kMetaW;
+  for (int r = 0; r < kRows; ++r) {
+    const uint32_t i = static_cast<uint32_t>(top) + static_cast<uint32_t>(r);
+    row_begin(i == selected);
+    if (i < count) {
+      const ColourRow& e = rows[i];
+      if (e.blink) {
+        s_band.drawCircle(dot_x, 8, 5, e.colour);
+        s_band.fillCircle(dot_x, 8, 2, e.colour);
+      } else {
+        s_band.fillCircle(dot_x, 8, 5, e.colour);
+      }
+      char buf[kSmallCols + 1];
+      fit(e.label ? e.label : "", SIZE_MAX, buf, cols < kSmallCols ? cols : kSmallCols);
+      text(buf, text_x, 0, kTextPrimary, true);
+      fit(e.comment ? e.comment : "", SIZE_MAX, buf, cols < kSmallCols ? cols : kSmallCols);
+      text(buf, text_x, 8, kTextMuted, true);
+    }
+    row_push(r, &sc);
+  }
+}
+
 void draw_animation_frame(const assets::Animation& anim, uint8_t frame) {
   if (anim.px == nullptr || anim.frames == 0 || anim.w == 0 || anim.h == 0) return;
   const size_t pixels = static_cast<size_t>(anim.w) * anim.h;

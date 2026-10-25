@@ -20,7 +20,7 @@ enum class Screen : uint8_t {
   Security, WifiSurvey, BleExplorer, Targets, Assess, AskOyster, Evidence, Settings,
   WifiResults, BleResults, GattTree, Detail,
   RunView, ConfirmDialog, TextEntry, Message, Module,
-  Unavailable, Help, KeyTest,  // keep KeyTest last (kScreenCount in app_controller.cpp)
+  Unavailable, Help, LedLegend, KeyTest,  // keep KeyTest last (kScreenCount in app_controller.cpp)
 };
 
 enum class ModeBanner : uint8_t { Offline, LiveRadio, AiConnected, Simulated, BackendOk, StartFailed };

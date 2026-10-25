@@ -77,6 +77,7 @@ Useful tools:
 | HV-33 | Control Deck on the real PC (`OYSTER_DECK_EXECUTOR=windows`): media keys, lock, Wake-on-LAN, service restart | UNVERIFIED | | | |
 | HV-34 | Smart Home IR (Home 5 > IR Remote): IR LED on GPIO44, each TV family against the owner's TV, one frame per key | UNVERIFIED | | | |
 | HV-35 | Smart Home with Home Assistant: unconfigured text first, then a real instance (rooms, devices, an action, impactful confirmation, failure paths) | UNVERIFIED | | | |
+| HV-36 | Status LED: green breathing online, amber blink offline, blue while a confirmation or unread answer waits, teal during a scan, announcements on finish/fail/notice; Help > Enter shows the legend with matching colours | UNVERIFIED | | | |
 
 ## How to run each check
 
@@ -491,3 +492,17 @@ vulnerable vs corrected fixture, success after legitimate authorisation, a verif
 object (compare with `.\scripts\fixture.ps1 synth`), interruption and recovery of a transfer, and the
 on-device confirmation for the virtual-LED write (including a timeout and a rejection). They stay
 **BLOCKED** until the M4 firmware is built.
+
+### HV-36 Status LED
+
+1. Boot: white breathing on the start screen; after the key press and provisioning, green breathing once the
+   status bar reads online. Unplug the backend PC from the network (or stop the backend): amber blink every 2 s
+   within a minute, green again after it is back.
+2. Start a Wi-Fi survey: teal breathing while it runs, then two green pulses (or two long red blinks when it
+   was cancelled or failed) and the state colour again.
+3. Ask Oyster AI a question and leave the run screen: when the answer arrives the LED blinks blue three
+   times and then breathes blue until the answer is opened.
+4. A confirmation dialog (backend job or a module page) turns the LED blue while it is open.
+5. Home > Help > Enter: the legend shows one coloured dot per row; the colours must match the LED.
+
+**Pass:** every colour and rhythm above is seen; nothing flickers faster than one blink per second.

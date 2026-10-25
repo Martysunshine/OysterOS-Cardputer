@@ -63,6 +63,16 @@ struct TileModel {
 };
 void draw_tiles(const TileModel& m);
 
+// Colour legend (Settings > LED colours): one row per entry with a filled dot in `colour` (a ring with a
+// centre dot when `blink` is set), the label on the first small line and the comment on the second.
+struct ColourRow {
+  uint16_t colour;      // RGB565
+  bool blink;           // true: drawn as a blinking style (ring + dot) instead of a filled disc
+  const char* label;    // <= 30 characters
+  const char* comment;  // <= 30 characters
+};
+void draw_colour_table(const char* title, const ColourRow* rows, uint8_t count, uint8_t selected, uint8_t top);
+
 // Action strip with key hints "Key:Action Key:Action" (key part in the accent colour). Leading '!' in
 // `left` = alert style. Uses the 8x16 font when it fits, else the 6x8 font (two lines if needed).
 void draw_footer(const char* left, const char* right);

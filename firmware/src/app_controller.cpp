@@ -288,6 +288,10 @@ modules::Id s_module = modules::Id::Hosts;
 modules::PageView s_view;
 uint8_t s_view_page = 0xFF;
 uint32_t s_module_guard_until = 0;
+// Status LED attention: an AI answer that has not been opened yet, and the run status it was seen with.
+bool s_answer_unseen = false;
+char s_run_seen_status[24] = {};
+constexpr uint8_t kLegendCount = 10;  // rows of the LED legend (table kLegend below)
 Screen s_help_from = Screen::MainMenu;
 uint16_t s_help_saved_scroll = 0;
 
@@ -1120,6 +1124,7 @@ const char* screen_hint(Screen s, const char** name) {
     case Screen::Unavailable: *name = "Unavailable module"; return "This module is not in this build. Back returns.";
     case Screen::Module: *name = modules::name(s_module); return "Enter opens the selected row. Back goes up one level. r refreshes where offered.";
     case Screen::Message: *name = "Message"; return "; . scroll. Back returns.";
+    case Screen::LedLegend: *name = "LED colours"; return "What the status LED shows. ; . move. Back returns.";
     default: *name = "This screen"; return "Back returns.";
   }
 }
@@ -1128,7 +1133,7 @@ void build_help(char* out, size_t n) {
   Body b = body_of(out, n);
   const char* name = nullptr;
   const char* hint = screen_hint(s_help_from, &name);
-  b.add("%s: %s\n\n", name, hint);
+  b.add("%s: %s\nEnter: what the LED colours mean.\n\n", name, hint);
   build_keys(b);
 }
 
@@ -2023,8 +2028,18 @@ void dispatch(NavEvent e, char c) {
       if (e == NavEvent::Back) {
         nav_back();
         s_scroll = s_help_saved_scroll;  // the screen below keeps its scroll position
+      } else if (e == NavEvent::Select) {
+        nav_go(Screen::LedLegend);
       } else {
         scroll_message(e);
+      }
+      return;
+
+    case Screen::LedLegend:
+      if (e == NavEvent::Back) {
+        nav_back();
+      } else {
+        list_move(nv, kLegendCount, e);
       }
       return;
 
@@ -2120,6 +2135,7 @@ void handle_event(const AppEvent& ev) {
                     ev.text[0] ? " - " : "", ev.text);
       toast("%s", s_last_result);
       const bool ok = ev.b == static_cast<uint32_t>(EventStatus::Success) || ev.b == static_cast<uint32_t>(EventStatus::Partial);
+      statusled::announce(ok ? statusled::Announce::Success : statusled::Announce::Failure);
       refresh_counts();
       // Show the results of an operation the user is watching.
       if (ok && (s_cur == Screen::WifiSurvey || s_cur == Screen::BleExplorer || s_cur == Screen::Assess)) {
@@ -2150,6 +2166,7 @@ void handle_event(const AppEvent& ev) {
       break;
     case AppEventType::ConfirmationRequested:
       s_last_poll_ms = millis() - kPollMs;  // poll the runner on this tick
+      statusled::announce(statusled::Announce::Notice);
       break;
     case AppEventType::ConfirmationClosed:
       if (s_pc_shown) {
@@ -2158,11 +2175,23 @@ void handle_event(const AppEvent& ev) {
         toast("Confirmation %s", ev.a == 1 ? "approved" : (ev.a == 2 ? "expired" : "rejected"));
       }
       break;
-    case AppEventType::RunUpdated:
+    case AppEventType::RunUpdated: {
+      const RunSummary& run = g_backend.latest_run();
+      const bool ended = std::strcmp(run.status, "succeeded") == 0 || std::strcmp(run.status, "failed") == 0;
+      if (ended && std::strcmp(run.status, s_run_seen_status) != 0) {
+        copy_str(s_run_seen_status, sizeof(s_run_seen_status), run.status);
+        if (s_cur != Screen::RunView) {
+          s_answer_unseen = true;  // blue until the answer is opened
+          statusled::announce(statusled::Announce::Notice);
+        }
+      } else if (!ended) {
+        s_run_seen_status[0] = 0;
+      }
       if (s_op.requested) s_op.requested = false;
       if (s_cur == Screen::RunView) s_dirty_content = true;
       s_dirty_footer = s_dirty_status = true;  // the banner follows the latest run status
       break;
+    }
     case AppEventType::StorageChanged:
       if (ev.a <= static_cast<uint32_t>(SdState::Full)) toast("SD: %s", to_string(static_cast<SdState>(ev.a)));
       s_dirty_status = true;
@@ -2371,6 +2400,43 @@ void render_security(const ListNav& nv) {
   ui::draw_tiles(ui::TileModel{"Security", right, tiles, kSecCount, 1, sel, static_cast<uint8_t>(nv.top)});
 }
 
+// Help > LED colours: the legend, drawn with the LED's own colours (statusled::swatch) so it matches.
+struct LegendEntry {
+  bool announce;
+  uint8_t which;  // statusled::Pattern or statusled::Announce
+  bool blink;
+  const char* label;
+  const char* comment;
+};
+const LegendEntry kLegend[] = {
+    {false, static_cast<uint8_t>(statusled::Pattern::Online), false, "Online, breathing", "backend reachable"},
+    {false, static_cast<uint8_t>(statusled::Pattern::Attention), false, "Attention, breathing", "confirm or new answer waits"},
+    {false, static_cast<uint8_t>(statusled::Pattern::Offline), true, "Offline, blink every 2 s", "not set up or no backend"},
+    {false, static_cast<uint8_t>(statusled::Pattern::Connecting), false, "Connecting, breathing", "joining Wi-Fi, reaching backend"},
+    {false, static_cast<uint8_t>(statusled::Pattern::Error), true, "Error, blink every 1 s", "certificate, token or start-up"},
+    {false, static_cast<uint8_t>(statusled::Pattern::LiveRadio), false, "Scanning, breathing", "Wi-Fi survey or Bluetooth runs"},
+    {false, static_cast<uint8_t>(statusled::Pattern::Boot), false, "Boot, breathing", "start screen, press any key"},
+    {true, static_cast<uint8_t>(statusled::Announce::Success), true, "Finished, 2 pulses", "an operation completed"},
+    {true, static_cast<uint8_t>(statusled::Announce::Failure), true, "Failed, 2 long blinks", "an operation failed"},
+    {true, static_cast<uint8_t>(statusled::Announce::Notice), true, "Notice, 3 quick blinks", "a request or answer arrived"},
+};
+static_assert(sizeof(kLegend) / sizeof(kLegend[0]) == kLegendCount, "legend row count");
+
+void render_led_legend(const ListNav& nv) {
+  ui::ColourRow rows[kLegendCount];
+  for (uint8_t i = 0; i < kLegendCount; ++i) {
+    uint8_t r, g, b;
+    if (kLegend[i].announce) {
+      statusled::swatch(static_cast<statusled::Announce>(kLegend[i].which), r, g, b);
+    } else {
+      statusled::swatch(static_cast<statusled::Pattern>(kLegend[i].which), r, g, b);
+    }
+    const uint32_t rgb = (static_cast<uint32_t>(r) << 16) | (static_cast<uint32_t>(g) << 8) | b;
+    rows[i] = ui::ColourRow{theme::rgb565(rgb), kLegend[i].blink, kLegend[i].label, kLegend[i].comment};
+  }
+  ui::draw_colour_table("LED colours", rows, kLegendCount, static_cast<uint8_t>(nv.sel), static_cast<uint8_t>(nv.top));
+}
+
 void render_keytest() {
   build_keytest(s_live_body, sizeof(s_live_body));
   ui::draw_message("Key tester [P11]", s_live_body);
@@ -2513,6 +2579,10 @@ void render_content(uint32_t now) {
           break;
       }
       break;
+    case Screen::LedLegend:
+      clamp_nav(nv, kLegendCount);
+      render_led_legend(nv);
+      break;
     case Screen::KeyTest:
       render_keytest();
       break;
@@ -2560,11 +2630,18 @@ void default_footer(char* left, size_t ln, char* right, size_t rn) {
     case Screen::Message:
     case Screen::Evidence:
     case Screen::RunView:
-    case Screen::Help:
     case Screen::Unavailable:
       std::snprintf(left, ln, "Del:Back ;.:Scroll");
       std::snprintf(right, rn, "%u/%u", static_cast<unsigned>(s_scroll) + 1,
                     static_cast<unsigned>(s_msg_total > 0 ? s_msg_total : 1));
+      break;
+    case Screen::Help:
+      std::snprintf(left, ln, "Del:Back Ent:LED colours");
+      std::snprintf(right, rn, "%u/%u", static_cast<unsigned>(s_scroll) + 1,
+                    static_cast<unsigned>(s_msg_total > 0 ? s_msg_total : 1));
+      break;
+    case Screen::LedLegend:
+      std::snprintf(left, ln, "Del:Back ;.:Move");
       break;
     case Screen::Module:
       std::snprintf(left, ln, "%s", s_view.left);
@@ -2655,6 +2732,8 @@ void draw(uint32_t now) {
 
 void on_enter(Screen s, bool returning) {
   if (!returning && (is_message_screen(s))) s_scroll = 0;
+  if (s == Screen::RunView) s_answer_unseen = false;
+  if (s == Screen::LedLegend && !returning) s_nav[sidx(Screen::LedLegend)] = ListNav{};
   switch (s) {
     case Screen::Security:
     case Screen::WifiSurvey:
@@ -2775,9 +2854,18 @@ void AppController::begin() {
 }
 
 // The status LED mirrors the mode banner and the connection state (see status_led.h for the patterns).
+// Attention (blue) wins over the connection state while something waits for the owner: a local confirmation
+// (backend job or module page) or an AI answer that has not been opened yet.
+bool attention_pending() {
+  if (s_pc_shown) return true;
+  if (s_cur == Screen::Module && s_view.kind == modules::PageKind::Confirm) return true;
+  return s_answer_unseen;
+}
+
 statusled::Pattern led_pattern() {
   if (!s_runtime) return statusled::Pattern::Error;
   if (current_mode() == ModeBanner::LiveRadio) return statusled::Pattern::LiveRadio;
+  if (attention_pending()) return statusled::Pattern::Attention;
   if (s_start_fail != 0) return statusled::Pattern::Error;
   switch (backend_conn()) {
     case ui::Conn::Online: return statusled::Pattern::Online;
