@@ -9,7 +9,8 @@ its own database (`companion.db` in settings.data_dir); the store is opened on f
 application's startup, and closed at shutdown. Authentication reuses oyster.auth through the same
 dependencies the existing routers use, and device enrolment reuses `app.state.store.create_device`.
 
-Only mock host adapters exist (oyster.companion.adapters): nothing here talks to a real host.
+Host adapters (oyster.companion.adapters): the mock, and the read-only `local` adapter for the machine the
+backend runs on. Nothing here talks to a remote host.
 """
 
 from __future__ import annotations

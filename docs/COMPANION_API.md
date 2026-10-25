@@ -1,10 +1,13 @@
 # Companion API: pairing and read-only host health (Issue #3)
 
-Status: **implemented and tested against mock adapters only.** The package is `backend/oyster/companion/`. There
-is no real Linux adapter, nothing in it has touched a real host, and none of it has run on the Cardputer
-(no firmware client exists). It implements the P1 item "typed authenticated API, pairing, `/health` and `/hosts`
-health, only authorized host metrics, no arbitrary remote shell execution" from the design plan (sections 5 and
-6) and milestone M4 of [`DEVELOPMENT_ROADMAP.md`](DEVELOPMENT_ROADMAP.md).
+Status: **implemented and tested against the mock adapter and a read-only `local` adapter** (this PC, through
+psutil; see "Adapters"). The package is `backend/oyster/companion/`. There is no remote (SSH) adapter and no
+other machine has been read. The `local` adapter's tests use a fake psutil except one that reads the real
+machine and only checks types and ranges. A firmware client exists (the Hosts module,
+`firmware/src/modules/hosts.cpp`); it compiles and its parsers have host tests, but **nothing has run on the
+Cardputer** against this API yet. It implements the P1 item "typed authenticated API, pairing, `/health` and
+`/hosts` health, only authorized host metrics, no arbitrary remote shell execution" from the design plan
+(sections 5 and 6) and milestone M4 of [`DEVELOPMENT_ROADMAP.md`](DEVELOPMENT_ROADMAP.md).
 
 It extends the backend described in [`API.md`](API.md): same bearer tokens, same error body
 (`{"error","detail"}`), same 401 / 403 / 404 / 429 meanings, same 4 KiB device bodies.
@@ -54,7 +57,7 @@ lists. There is no field anywhere that carries a command, script or arguments.
 ### Hosts and the allowlist
 
 `HostEnrol`: `host_id` (`[0-9a-zA-Z_-]{1,40}`), `display_name` (1 to 64 printable characters), `adapter`
-(`"mock"` only), `metrics` (1 to 6 distinct names from the fixed set), `services` (up to 16 distinct service
+(`"mock"` or `"local"`), `metrics` (1 to 6 distinct names from the fixed set), `services` (up to 16 distinct service
 names, `[0-9a-zA-Z_.@-]{1,64}`), `device_ids` (up to 16 devices that may see the host; empty means nobody but
 the owner, and ids need not exist yet). At most 16 hosts can be enrolled (409 beyond that).
 
@@ -136,8 +139,51 @@ method that takes a command, script or free-form argument, and a test asserts th
 `MockHostAdapter` returns deterministic fixtures and can inject faults (`unreachable`, `timeout`, `partial`) or
 misbehave by returning more than was asked (`overshare`), to prove the API drops it.
 
-**No real Linux adapter ships.** Whoever writes one (design plan section 5: SSH with host-key verification, or a
-local OS adapter) must guarantee, and document here:
+### The `local` adapter (this PC)
+
+`LocalHostAdapter` (`adapter: "local"`) reads the machine the backend itself runs on, through psutil and the C
+runtime only: no network, no credentials, no child process, nothing is written or executed. Each metric is one
+constant read from a fixed table; the only text that reaches the operating system is the name of an enrolled
+service, matched against the service-name pattern at enrolment and again in the adapter, and passed to the
+service API as a name (never to a shell). A read that fails drops only that metric (it becomes `missing`, the
+report `partial`); when nothing can be read the API answers the usual 502. Error text is logged by exception
+class only.
+
+| Metric | Source | Notes |
+| --- | --- | --- |
+| `cpu_percent` | `psutil.cpu_percent`, one blocking sample of 0.2 s | psutil's non-blocking mode keeps its reference per thread and the API reads on pool threads, so a "primed once" value would be a meaningless 0.0; the 0.2 s sample is far below the 5 s deadline |
+| `mem_used_percent` | `psutil.virtual_memory().percent` | physical memory in use |
+| `disk_used_percent` | `psutil.disk_usage` of the system drive | `%SystemDrive%` if it looks like `X:`, else `C:`; `/` on other platforms |
+| `uptime_s` | now minus `psutil.boot_time()` | on Windows with Fast Startup this counts from the last full boot, as Task Manager does |
+| `services` | `psutil.win_service_get(name).status()` for the enrolled names | `running` is `active`; `stopped` and `paused` are `inactive`; pending states, a missing service, an access error, or any non-Windows platform are `unknown` |
+| `load_1m` | `os.getloadavg()[0]` where the C runtime has it | **not available on Windows**: reported missing (state `partial`), never emulated |
+
+What it does **not** do: `failed` is never reported (the service manager reports a crashed service as stopped; the
+exit code is not read); no per-process data, no logs, no network or temperature values, no other disks; the
+values are a snapshot of the moment of the request, not an average. Enrolment of `local` still checks that the
+adapter is read-only and supports every requested metric, and every other guarantee above is unchanged
+(allowlist enforced three times, value ranges, 4 KiB bounds, 502 on failure). A hung operating-system call is
+not interruptible: the API stops waiting after 5 s, but the pool thread stays busy until the call returns (the
+pool has 4 threads).
+
+Verified on a Windows 11 PC only (values in range, services `running`/`stopped`/missing); never on Linux or macOS.
+
+### Seeding the local PC
+
+`oyster.companion.seed.ensure_local_host(store_or_registry, device_ids, host_id="this-pc", display_name="This PC",
+services=(), *, clock, audit=None)` enrols the local PC with the metrics `cpu_percent`, `mem_used_percent`,
+`disk_used_percent`, `uptime_s` (plus `services` when a service allowlist is given), visible to exactly the given
+device ids. It accepts a `CompanionStore` or a `HostRegistry`, validates through the same models as the owner
+route (so the same patterns and caps apply; `ValueError` for input the API would refuse, `Conflict` at the
+16-host cap), and is idempotent: when the stored record already has this name, adapter, metrics, services and
+device set nothing is written (`SeedResult.changed` is false); otherwise the record is replaced and `created_at`
+is kept. With `audit=` it records `host_enrolled` like the owner route. The CLI wiring (`oyster seed-demo`) is
+separate.
+
+### Remote adapters
+
+**No remote (SSH) adapter ships.** Whoever writes one (design plan section 5: SSH with host-key verification)
+must guarantee, and document here:
 
 - strictly read-only access: a dedicated unprivileged account, no sudo, no write-capable credentials;
 - an authenticated, encrypted transport with verified host identity (for SSH, a pinned host key);
@@ -147,7 +193,7 @@ local OS adapter) must guarantee, and document here:
 - the API's 5 s deadline does not stop a hung read: the adapter must stop itself (the pool has 4 threads).
 
 Adding an adapter kind means extending `AdapterKind` in `models.py` and the factory in `adapters.py`; until
-then enrolment accepts `"mock"` only.
+then enrolment accepts `"mock"` and `"local"` only.
 
 ## Issue requirement to endpoint, module and test
 
@@ -166,15 +212,20 @@ All tests are in `tests/companion/` and run without network, with an injected cl
 | Audit | `audit.py`, `GET /v1/admin/audit` | `test_companion_audit::test_events_are_recorded_without_secrets`, `::test_the_audit_log_has_no_way_to_change_or_remove_rows`, `::test_the_database_itself_refuses_updates_and_deletes_of_audit_rows`, `::test_pages_do_not_overlap_and_end`, `::test_audit_query_is_bounded` |
 | Own database, idempotent start-up | `store.py`, `mount.py` | `test_companion_safety::test_the_companion_has_its_own_database_file`, `::test_start_up_creates_tables_idempotently_and_keeps_data`, `::test_the_original_lifespan_still_runs`, `::test_install_is_idempotent` |
 | Exactly the intended routes | `api.py` | `test_companion_safety::test_openapi_lists_exactly_the_intended_routes` |
+| Local adapter (this PC), read-only | `adapters.py` (`LocalHostAdapter`) | `test_companion_local_adapter::test_real_psutil_gives_typed_values_in_range`, `::test_values_come_from_the_expected_reads`, `::test_only_the_requested_metrics_are_read`, `::test_windows_service_states_map_to_the_four_api_states`, `::test_only_well_formed_enrolled_service_names_reach_the_operating_system`, `::test_a_failing_read_drops_only_that_metric_and_never_leaks_its_error`, `::test_load_is_missing_where_the_os_has_no_load_average`, `::test_the_adapter_is_read_only_and_has_no_command_surface`, `::test_a_local_host_can_be_enrolled_and_read_by_its_device`, `::test_load_1m_on_a_platform_without_it_is_partial_not_faked`, `::test_when_nothing_can_be_read_the_answer_is_a_clean_502`, `::test_enrolment_still_applies_every_allowlist_rule_to_local_hosts` |
+| Seed helper | `seed.py` | `test_companion_local_adapter::test_seed_enrols_the_local_pc_for_the_given_devices`, `::test_seed_is_idempotent_and_replaces_only_what_differs`, `::test_seed_refuses_what_the_api_would_refuse`, `::test_seed_respects_the_host_cap` |
 
 Run them with `python -m pytest tests/companion -o addopts="" -q -p no:cacheprovider`.
 
 ## Known gaps
 
-- No real host adapter, so no real host has ever been read; adapter timeouts, SSH host-key handling and
-  least-privilege accounts are unproven.
-- No firmware client and no on-device pairing screen; the Cardputer cannot use these routes yet.
-- `GET /v1/hosts/{id}/logs`, services control and any action job are out of scope (read-only metrics only).
+- The only real host ever read is the PC the backend runs on (`local` adapter, Windows 11, psutil 7.2); adapter
+  timeouts for remote hosts, SSH host-key handling and least-privilege accounts are unproven. The `local`
+  adapter has no timeout of its own for a hung operating-system call.
+- The firmware Hosts module (`firmware/src/modules/hosts.cpp`) has not run on the Cardputer, and there is no
+  on-device pairing screen.
+- `GET /v1/hosts/{id}/logs`, services control and any action job are out of scope (read-only metrics only); the
+  device's Logs page says so instead of showing anything.
 - Audit retention is unbounded; there is no rotation or export. A device that polls health adds a row per read.
 - Host visibility is per device id and must be edited by re-enrolling the host; there is no per-metric device
   scoping and no owner-side health read.

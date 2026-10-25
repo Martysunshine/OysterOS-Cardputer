@@ -18,7 +18,9 @@ MetricName = Literal[
 ]
 ServiceState = Literal["active", "inactive", "failed", "unknown"]
 SERVICE_STATES = ("active", "inactive", "failed", "unknown")
-AdapterKind = Literal["mock"]  # no real Linux adapter ships yet (docs/COMPANION_API.md)
+# "mock": deterministic fixtures; "local": read-only metrics of the machine the backend runs on.
+# No remote (SSH) adapter ships yet (docs/COMPANION_API.md).
+AdapterKind = Literal["mock", "local"]
 
 # (min, max) per numeric metric; a value outside its range is treated as missing, never forwarded
 METRIC_BOUNDS: dict[str, tuple[float, float]] = {
