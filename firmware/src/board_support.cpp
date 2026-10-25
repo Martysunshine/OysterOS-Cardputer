@@ -280,6 +280,10 @@ bool BoardSupport::read_keys(KeySnapshot& out) {
   return false;
 }
 
+bool BoardSupport::go_pressed() { return M5.BtnA.wasPressed(); }
+
+bool BoardSupport::keys_down() const { return any_key(current_keys()); }
+
 void BoardSupport::set_brightness(uint8_t level) {
   // Raw backlight level 0..255, kept above zero so the screen never looks switched off.
   M5Cardputer.Display.setBrightness(level < 8 ? 8 : level);

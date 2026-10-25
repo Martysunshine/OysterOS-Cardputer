@@ -82,12 +82,12 @@ warnings). These are **build measurements, not hardware results**: nothing has r
 
 | Item | Value |
 | --- | --- |
-| `firmware.bin` size | 1,672,416 bytes |
-| Share of the 5 MiB factory partition | 31.9% (1,672,045 bytes of 5,242,880 reported by PlatformIO) |
-| Static RAM (`.data` + `.bss`) | 38.1%: 124,944 of 327,680 bytes |
+| `firmware.bin` size | 1673616 bytes |
+| Share of the 5 MiB factory partition | 31.9% (1,673,257 bytes of 5,242,880 reported by PlatformIO) |
+| Static RAM (`.data` + `.bss`) | 38.1%: 124,952 of 327,680 bytes |
 | Heap left at boot, minimum free heap, largest free block | **Not measured.** The project goals (>= 64 KiB / >= 32 KiB) are checked from the on-device telemetry; see HARDWARE_VERIFICATION.md |
-| `firmware.bin` SHA-256 | `0cc446875ad8f9a46d6a0bfc9e9902bf25841e2d5aa3d60c7cac2aaa8749ec18` |
-| Host tests (`pio test -e native`) | 172 cases pass (core logic, delivery/ledger rules, identity, paging, input mapping incl. Home/Help) |
+| `firmware.bin` SHA-256 | `edf4f78fbbff17b1c8298b79a01fd6fc9eefb07a3187020dc9d804ec402f36a9` |
+| Host tests (`pio test -e native`) | 173 cases pass (core logic, delivery/ledger rules, identity, paging, input mapping incl. Home/Help) |
 
 The SHA-256 changes with any source change; `scripts/firmware-build.ps1` prints the current one.
 The assessment worker task uses a 16 KiB stack (its TLS handshake shares it; the 9.5 KB discovery result no longer lives on it:

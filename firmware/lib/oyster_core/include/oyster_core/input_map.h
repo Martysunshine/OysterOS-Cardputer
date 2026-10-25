@@ -28,6 +28,12 @@ struct KeySnapshot {
   uint8_t nchars = 0;
 };
 
+// True when the snapshot holds at least one pressed key or modifier.
+inline bool any_key(const KeySnapshot& k) {
+  return k.up || k.down || k.left || k.right || k.enter || k.esc || k.backspace || k.del || k.tab || k.space ||
+         k.fn || k.shift || k.ctrl || k.opt || k.alt || k.nchars > 0;
+}
+
 enum class NavEvent : uint8_t { None, Up, Down, Left, Right, Select, Back, Cancel, Char, Erase, Tab, Home, Help };
 
 struct NavOutput {

@@ -2600,6 +2600,31 @@ bool help_allowed() {
   }
 }
 
+// ---- lock screen (G0 button) ----------------------------------------------------------------------
+// G0 covers whatever is open with the logo screen; any key uncovers it unchanged. It is a screen cover, not an
+// authentication: operations, polling and the event queue keep running behind it, the emergency cancel chord
+// still works, and the key that unlocks is consumed (it never acts on the screen underneath, nor on a
+// confirmation dialog that opened meanwhile, whose key guard restarts).
+bool s_locked = false;
+bool s_swallow = false;  // after unlocking: keys are ignored until all are released (Cancel excepted)
+
+bool lock_allowed() {
+  return s_cur != Screen::Boot && s_cur != Screen::BoardError && s_cur != Screen::Provisioning;
+}
+
+void enter_lock() {
+  s_locked = true;
+  ui::draw_start_screen("Any key:Unlock", "OYSTER OS");
+}
+
+void leave_lock(uint32_t now) {
+  s_locked = false;
+  s_swallow = true;
+  if (s_cur == Screen::ConfirmDialog) s_pc_guard_until = now + kConfirmGuardMs;
+  ui::clear_screen();
+  mark_all();
+}
+
 }  // namespace
 
 // ===== AppController ================================================================================
@@ -2641,11 +2666,39 @@ void AppController::begin() {
 
 void AppController::tick() {
   const uint32_t now = millis();
+  if (g_board.go_pressed() && !s_locked && lock_allowed()) enter_lock();
+  bool keys_consumed = false;
+  if (s_locked) {
+    KeySnapshot k;
+    if (g_board.read_keys(k)) {
+      const NavOutput nav = s_input.map(k);
+      if (nav.count > 0 && nav.events[0] == NavEvent::Cancel) {  // Cancel is always the first event
+        if (s_cur == Screen::ConfirmDialog && s_pc_shown) resolve_pending(false);
+        emergency_cancel();
+        ui::draw_footer("Cancelled", "Any key:Unlock");
+      } else if (any_key(k)) {
+        leave_lock(now);
+        keys_consumed = true;
+      }
+    }
+    if (s_locked) {
+      on_event();
+      if (now - s_last_poll_ms >= kPollMs) {
+        s_last_poll_ms = now;
+        poll_state(now);
+      }
+      ui::tick_start_screen();
+      screen_ = s_cur;
+      return;  // nothing of the covered screen is drawn
+    }
+  }
   s_input.set_text_mode(s_cur == Screen::TextEntry);
+  if (s_swallow && !g_board.keys_down()) s_swallow = false;
   KeySnapshot k;
-  if (g_board.read_keys(k)) {
-    const NavOutput nav = s_input.map(k);
-    if (s_cur == Screen::KeyTest) keytest_record(k, nav);
+  if (!keys_consumed && g_board.read_keys(k)) {
+    NavOutput nav = s_input.map(k);
+    if (s_swallow && !(nav.count > 0 && nav.events[0] == NavEvent::Cancel)) nav.count = 0;
+    if (s_cur == Screen::KeyTest && !s_swallow) keytest_record(k, nav);
     if (nav.count > 0) handle_input(nav);
   }
   on_event();

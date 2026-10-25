@@ -68,9 +68,10 @@ Useful tools:
 | HV-24 | M4: access-policy checks vulnerable vs corrected | BLOCKED (M4 not built) | | | |
 | HV-25 | M4: diagnostic transfer hash + power interruption recovery | BLOCKED (M4 not built) | | | |
 | HV-26 | M4: local confirmation for the virtual-LED write | BLOCKED (M4 not built) | | | |
-| HV-27 | Backup before the first flash: `firmware-backup.ps1` dumps 8 MB with verification; restoring it brings the original firmware back | UNVERIFIED | | | |
-| HV-28 | Flash gate: `firmware-flash.ps1` refuses without a verified backup of that chip, passes with one | UNVERIFIED | | | |
-| HV-29 | Boot splash drawn once at start-up, then the Home screen (heading `OYSTER OS`, tile grid, greyed-out tiles) | UNVERIFIED | | | |
+| HV-27 | Backup before the first flash: `firmware-backup.ps1` dumps 8 MB with verification; restoring it brings the original firmware back | PASS (dump); restore not tried | 2026-10-25 | n/a | 8,388,608 bytes, `esptool verify_flash` digest matched, valid bootloader and partition table (factory app at 0x10000). A first read at 460800 baud stalled at 19 % and was stopped (nothing written); the default is now 115200. Restore: see HV-23 |
+| HV-28 | Flash gate: `firmware-flash.ps1` refuses without a verified backup of that chip, passes with one | PARTIAL | 2026-10-25 | 0cc446875ad8 | Passed with the verified backup and the upload hash-verified. The refusal path was not tried on the device |
+| HV-29 | Boot splash drawn once at start-up, then the Home screen (heading `OYSTER OS`, tile grid, greyed-out tiles) | PARTIAL (owner-observed) | 2026-10-25 | 0cc446875ad8 | Boot, splash, Home and the four greyed-out tiles were seen on the real display and looked right; no photographs, no flicker/colour measurements. Oyster AI showed unavailable while the device was not yet provisioned |
+| HV-30 | Start screen waits for any key; the G0 button shows the same logo screen as a lock, any key returns to the same screen | UNVERIFIED | | | |
 
 ## How to run each check
 
@@ -290,8 +291,10 @@ them.
 
 1. Switch the device off and on with the serial monitor open. A boot splash (the oyster and pearl art) is
    drawn once at start-up, before the first screen; short `Starting: <step>` messages may follow while the
-   modules start. Look for flicker, tearing, wrong colours (the art was converted to RGB565 on a PC) and
-   how long it stays up.
+   modules start. When start-up is done the footer reads `Any key:Start` and the logo stays up, with the slow
+   mascot blink, until a key is pressed (USB provisioning is still served meanwhile). Look for flicker, tearing,
+   wrong colours (the art was converted to RGB565 on a PC), and check that the key that starts the system does
+   not also act on Home.
 2. The first screen is Home, headed `OYSTER OS`, with a two-column tile grid: Security, Oyster AI and Linux
    on the left; Control Deck, Smart Home and Original Apps on the right; Settings and Help in a fourth row
    that scrolls into view. Check icons, labels, the selection stripe and the number shortcuts `1` to `8`.
@@ -299,8 +302,24 @@ them.
    "Not available in this build" screen that Back leaves. Nothing may pretend to connect or run.
 4. Check the Oyster AI tile against the backend state (connected, or unavailable with a reason).
 
-**Pass:** the splash appears once without artefacts, Home is readable at 240x135, and the four unbuilt
+**Pass:** the splash appears without artefacts, waits for a key, Home is readable at 240x135, and the four unbuilt
 modules are visibly unavailable. Record anything clipped or hard to read, with photographs.
+
+
+### HV-30 Start screen and G0 lock
+
+1. After start-up the logo stays on screen with `Any key:Start` and the slow mascot blink. Press a key: Home
+   opens, and that key must not also select or move anything on Home.
+2. Open a screen (for example Security), then press the **G0** button once. The logo screen appears with
+   `Any key:Unlock`. Press any key: the screen you left returns unchanged, and that key did not act on it.
+3. Lock while an operation runs (a Wi-Fi survey): it keeps running behind the logo; after unlocking the
+   progress or result is shown. Lock while the keyboard is in text entry: the text is still there afterwards.
+4. Emergency cancel while locked: press Ctrl+C (or Fn+Esc). The footer reads `Cancelled`; the operation stops.
+5. G0 held while resetting or powering up puts the chip into download mode (dark screen): that is the hardware,
+   not a bug. Do not hold it at power-on.
+
+**Pass:** all of the above behave as described; note anything unclear. The lock is a screen cover, not an
+authentication: any key opens it.
 
 ### HV-24 to HV-26 (after M4 exists)
 

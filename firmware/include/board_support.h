@@ -41,6 +41,8 @@ class BoardSupport {
   bool remount_sd();
   int battery_percent() const;       // -1 when unknown
   bool read_keys(KeySnapshot& out);  // after M5Cardputer.update(); true on change. Arrows/esc derived from Fn combos
+  bool go_pressed();                 // G0 button (GPIO0) pressed since the last call; after M5Cardputer.update()
+  bool keys_down() const;            // any keyboard key or modifier is held right now
   void set_brightness(uint8_t level);  // raw backlight 0-255, clamped to >= 8 so the screen never goes dark
 
  private:

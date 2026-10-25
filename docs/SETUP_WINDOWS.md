@@ -145,7 +145,7 @@ and prints the backup command. `-SkipBackupCheck` overrides the gate after a lou
 pause: the factory firmware and original apps are then lost unless you saved them some other way.
 `-DryRun` prints what it would do without touching the device.
 
-What to expect (not yet observed on hardware): the screen shows a boot splash, then the Home screen. Until
+What to expect (not yet observed on hardware): the screen shows a boot splash that waits for any key, then the Home screen. Until
 the device has backend settings its heading reads `OYSTER OS (setup!)`; once provisioned it reads
 `OYSTER OS`. The serial monitor shows
 boot logs with the board id, flash size, reset reason and heap numbers. Write down what you actually see

@@ -67,6 +67,11 @@ under Security, next to the design's Wi-Fi / BLE / Findings entries.
 
 ## Logical actions and proposed keys
 
+The **Go button (G0)** is not a keyboard action: it covers the current screen with the logo screen (`Any key:Unlock`)
+until any key is pressed, then shows the same screen again. The unlocking key is consumed, work in progress
+continues behind it, and the emergency cancel chord still works. It is not offered on the boot, board-error and
+USB-provisioning screens. The screen simulator does not model it.
+
 All bindings are **proposed and UNVERIFIED**; Settings > Key tester shows the physical keys and the resolved
 action so they can be confirmed and recorded in [Hardware verification](HARDWARE_VERIFICATION.md).
 

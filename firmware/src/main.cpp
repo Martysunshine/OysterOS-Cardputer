@@ -50,28 +50,40 @@ struct BootResults {
 BootResults s_boot;
 
 // Boot splash: the image is drawn once; start-up steps then only update the footer line and advance the
-// mascot's loader animation by at most one frame per frame period. No task or timer: frames move only
-// while setup() is running, and the animation stops when the first screen replaces the splash.
-uint8_t s_loader_frame = 0;
-uint32_t s_loader_ms = 0;
-constexpr uint32_t kMinSplashMs = 1500;  // keep the splash up long enough to be seen on a fast start
-
-void loader_tick() {
-  const assets::Animation& a = assets::loader();
-  const uint32_t period = a.fps > 0 ? 1000u / a.fps : 200u;
-  const uint32_t now = millis();
-  if (now - s_loader_ms < period) return;
-  s_loader_ms = now;
-  ui::draw_animation_frame(a, s_loader_frame);
-  s_loader_frame = static_cast<uint8_t>((s_loader_frame + 1) % (a.frames > 0 ? a.frames : 1));
-}
+// mascot's loader animation by at most one frame per frame period (ui::tick_start_screen). No task or timer:
+// frames move only while setup() is running, and the animation stops when the first screen replaces the splash.
+constexpr uint32_t kMinSplashMs = 1500;     // the splash stays up at least this long, even before a key press
+constexpr uint32_t kKeyReleaseWaitMs = 1000;  // after the start key: wait this long for it to be released
 
 void splash(const char* step) {
   if (!s_boot.ui) return;
   char left[40];
   std::snprintf(left, sizeof(left), "Starting: %s", step);
   ui::draw_footer(left, "v" OYSTER_FIRMWARE_VERSION);
-  loader_tick();
+  ui::tick_start_screen();
+}
+
+// After start-up the logo stays on screen until a key is pressed. The loader keeps its slow blink, and the
+// USB provisioning port is still serviced, so the device can be set up from the PC while it waits.
+void wait_for_start_key(uint32_t splash_start) {
+  if (!s_boot.ui) return;
+  ui::draw_footer("Any key:Start", "v" OYSTER_FIRMWARE_VERSION);
+  for (;;) {
+    M5Cardputer.update();
+    g_provisioning.poll();
+    ui::tick_start_screen();
+    if (millis() - splash_start >= kMinSplashMs && M5Cardputer.Keyboard.isChange() &&
+        M5Cardputer.Keyboard.isPressed()) {
+      break;
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+  // The key that started the system must not also act on the first screen.
+  const uint32_t t0 = millis();
+  while (M5Cardputer.Keyboard.isPressed() && millis() - t0 < kKeyReleaseWaitMs) {
+    vTaskDelay(pdMS_TO_TICKS(10));
+    M5Cardputer.update();
+  }
 }
 
 void write_boot_event() {
@@ -162,8 +174,7 @@ void setup() {
   // Boot splash: drawn once, in bands (no full-screen buffer); the first screen replaces it.
   const uint32_t splash_start = millis();
   if (s_boot.ui) {
-    ui::draw_image(assets::splash(), 0, 0, 0);
-    splash("display");
+    ui::draw_start_screen("Starting: display", "v" OYSTER_FIRMWARE_VERSION);
   }
   telemetry_register_task("loop", xTaskGetCurrentTaskHandle());
 
@@ -186,10 +197,8 @@ void setup() {
   }
 
   report_startup_failures();
-  while (s_boot.ui && millis() - splash_start < kMinSplashMs) {  // let a fast start still show the animation
-    loader_tick();
-    vTaskDelay(pdMS_TO_TICKS(20));
-  }
+  wait_for_start_key(splash_start);
+  if (s_boot.ui) ui::clear_screen();
   g_app.begin();  // opens the session (needed before the boot event can be recorded)
   write_boot_event();
 }

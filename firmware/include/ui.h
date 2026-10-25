@@ -90,5 +90,13 @@ void draw_image(const assets::Image& img, int x, int y, uint16_t bg, bool dim = 
 // Draws one opaque frame of a loader animation at its own position, straight from flash (no RAM buffer).
 void draw_animation_frame(const assets::Animation& anim, uint8_t frame);
 
+// Start / lock screen: the boot splash with the mascot's slow loader animation. draw_start_screen() paints the
+// image and the action strip once; tick_start_screen() advances the animation by at most one frame per frame
+// period (no task or timer: the caller's loop drives it). clear_screen() paints the whole panel in the
+// background colour, so no splash pixels remain between the regions of the next screen.
+void draw_start_screen(const char* left, const char* right);
+void tick_start_screen();
+void clear_screen();
+
 }  // namespace ui
 }  // namespace oyster

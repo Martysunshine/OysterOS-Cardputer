@@ -601,4 +601,28 @@ void draw_animation_frame(const assets::Animation& anim, uint8_t frame) {
   draw_image(img, anim.x, anim.y, kSurfaceBase);
 }
 
+namespace {
+uint8_t s_loader_frame = 0;
+uint32_t s_loader_ms = 0;
+}  // namespace
+
+void draw_start_screen(const char* left, const char* right) {
+  draw_image(assets::splash(), 0, 0, 0);
+  s_loader_frame = 0;
+  s_loader_ms = millis();
+  draw_footer(left, right);
+}
+
+void tick_start_screen() {
+  const assets::Animation& a = assets::loader();
+  const uint32_t period = a.fps > 0 ? 1000u / a.fps : 200u;
+  const uint32_t now = millis();
+  if (now - s_loader_ms < period) return;
+  s_loader_ms = now;
+  draw_animation_frame(a, s_loader_frame);
+  s_loader_frame = static_cast<uint8_t>((s_loader_frame + 1) % (a.frames > 0 ? a.frames : 1));
+}
+
+void clear_screen() { M5Cardputer.Display.fillScreen(kSurfaceBase); }
+
 }  // namespace oyster::ui

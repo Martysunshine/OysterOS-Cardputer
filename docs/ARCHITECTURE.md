@@ -84,7 +84,7 @@ Toolchain: PlatformIO, Arduino-ESP32 2.0.17 / ESP-IDF 4.4.7, NimBLE-Arduino 2.x,
 | `oyster_core` (`lib/oyster_core`) | platform-independent: ids, types, JSON writer, JSONL recovery, SHA-256, transfer protocol, LocalPolicy, lab profile (generated) |
 
 Boot order: `g_board.begin` -> `ui::begin` (the boot splash is drawn once here) -> `g_config.begin` -> `g_evidence.begin(Live)` -> `g_radio.begin` ->
-`g_results.begin` -> `g_ble.begin` -> `g_backend.begin` -> `g_runner.begin` -> `g_app.begin`.
+`g_results.begin` -> `g_ble.begin` -> `g_backend.begin` -> `g_runner.begin` -> wait for the start key on the logo screen (USB provisioning still served) -> `g_app.begin`.
 `loop()` runs `M5Cardputer.update(); g_provisioning.poll(); g_app.tick();`. Long work happens on the
 runner task, so the UI loop never blocks on the network or radio.
 

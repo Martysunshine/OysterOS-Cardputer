@@ -345,6 +345,20 @@ void test_help_keeps_other_hotkeys() {
   TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(NavEvent::Help), static_cast<uint8_t>(o.events[1]));
 }
 
+void test_any_key_sees_keys_and_modifiers() {
+  TEST_ASSERT_FALSE(any_key(KeySnapshot{}));
+  KeySnapshot k;
+  k.shift = true;
+  TEST_ASSERT_TRUE(any_key(k));
+  KeySnapshot e;
+  e.enter = true;
+  TEST_ASSERT_TRUE(any_key(e));
+  TEST_ASSERT_TRUE(any_key(chars("a")));
+  KeySnapshot f;
+  f.fn = true;
+  TEST_ASSERT_TRUE(any_key(f));
+}
+
 void test_nav_event_names_are_distinct() {
   const NavEvent all[] = {NavEvent::None,   NavEvent::Up,   NavEvent::Down,  NavEvent::Left, NavEvent::Right,
                           NavEvent::Select, NavEvent::Back, NavEvent::Cancel, NavEvent::Char, NavEvent::Erase,
@@ -393,6 +407,7 @@ int main(int, char**) {
   RUN_TEST(test_question_mark_is_text_in_text_mode);
   RUN_TEST(test_help_ignores_modifier_and_fn_chords);
   RUN_TEST(test_help_keeps_other_hotkeys);
+  RUN_TEST(test_any_key_sees_keys_and_modifiers);
   RUN_TEST(test_nav_event_names_are_distinct);
   return UNITY_END();
 }
