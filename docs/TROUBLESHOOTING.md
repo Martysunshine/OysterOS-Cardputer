@@ -246,7 +246,7 @@ Other notes:
 | Runs end `ai_unavailable` | `AI_API_KEY` or `AI_MODEL` missing or rejected. Run `oyster ai-check` |
 | Simulator gets 401 | The token file no longer matches (database reset, or device re-enrolled). Delete `backend\data\sim-cardputer-01.token` (or `<DeviceId>.token`) and run `.\scripts\sim.ps1` again |
 | `demo-m1.ps1` stops at "Not configured" | Intended: it does not run without a real model. Configure the provider (SETUP step 6) |
-| `demo-m1.ps1` stops with "oyster-sim exited ... right after registering" | The simulator stopped before any job was queued, so nothing could execute the AI's device jobs. The AI was deliberately not called. Known integration issue; once `oyster-sim` has a keep-polling option, pass it with `-SimExtraArgs` |
+| `demo-m1.ps1` stops with "oyster-sim exited ... right after registering" | The simulator stopped before any job was queued, so nothing could execute the AI's device jobs. The AI was deliberately not called. The script starts it with `--serve` (keep polling); if it still exits, read `sim.err.log` in the run's log folder |
 | Logs of a demo run | `backend\data\logs\demo-m1-<timestamp>\` (`backend.*.log`, `sim.*.log`, `session.txt`) |
 
 ## Host unit tests (`pio test -e native`) are SKIPPED

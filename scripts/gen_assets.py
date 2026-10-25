@@ -5,7 +5,7 @@ Dev-only tool, not part of the product install. Needs Pillow:  pip install pillo
 
 Deterministic: the same inputs and Pillow version give byte-identical output (no timestamps).
 Inputs:
-  assets/mascot/oysterOS-logo-512.png  the owner's mascot (RGBA). Used pixel-exact, never redrawn.
+  assets/mascot/oysterOS-logo-512.png  the mascot (RGBA). Used pixel-exact, never redrawn.
   assets/loader/frame_0..5.png         6 mascot-area frames cut from an image-to-video render of the mascot
   assets/raw/sheet_*.png               flat feature icons (3x2 sheets); their background becomes the key
   assets/raw/banner_plate_v1.png       README banner background + wordmark (the mascot is added here)

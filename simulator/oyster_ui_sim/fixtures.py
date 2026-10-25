@@ -149,7 +149,7 @@ def default_fixtures() -> Fixtures:
     macros = [
         Macro(1, "get_server_status", "Server status", "MINI-PC", "reads status only", 1, False, True),
         Macro(2, "start_dev_stack", "Start dev stack", "MINI-PC", "starts services", 3, True, False),
-        Macro(3, "get_site_status", "Red Orca status", "MINI-PC", "reads status only", 1, False, True),
+        Macro(3, "get_site_status", "Website status", "MINI-PC", "reads status only", 1, False, True),
         Macro(4, "run_backup", "Backup", "NAS-01", "writes a backup archive", 2, True, False),
     ]
     rooms = [

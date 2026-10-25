@@ -51,11 +51,11 @@ scaffold), not the design's M0 (inventory and preservation). Where our milestone
 | Our milestone | State |
 | --- | --- |
 | M0 Compatibility | Done on the PC: the toolchain is pinned and the firmware builds. **Hardware bring-up is pending**: board identity, flashing, display and keys have not been tried on a device |
-| M1 AI vertical slice | Done on the PC with a **fake** AI provider and mocked HTTP. **The real Groq run is pending** (it needs a key; see open decision 5) |
+| M1 AI vertical slice | Done on the PC: fake provider and mocked HTTP in the tests, and a real Groq model in the lab demo (`scripts/demo-m1.ps1`, simulated device). Not yet run with the Cardputer |
 | M2 Live Wi-Fi survey | Firmware written and compiled; the platform-independent logic is host-tested. **Unverified on hardware** |
 | M3 Live BLE explorer | Same as M2. **Unverified on hardware** |
 | M4 Assessment and collection | Backend and simulator side done; **device side not built** |
-| M5 Agentic investigation | Backend orchestrator and a fake-provider end-to-end run done on the PC. The real Groq run and the device-side M4 are pending; the device only relays the question |
+| M5 Agentic investigation | Backend orchestrator and a fake-provider end-to-end run done on the PC. The device-side M4 is pending; the device only relays the question |
 | M6 Reliability and release | Docs and scripts only so far; no reliability test has run (they need a device) |
 
 How they line up with the design's milestones:
@@ -69,7 +69,7 @@ How they line up with the design's milestones:
 | M4 Companion and Linux | our M1 AI vertical slice: authenticated backend, device API, jobs, simulator | Backend and simulator done on the PC, with a fake AI provider. Pairing is replaced by device tokens issued with the admin token and loaded over USB. Linux host health: read-only API with mock adapters ([`COMPANION_API.md`](COMPANION_API.md)); no real adapter, no firmware client |
 | M5 Smart Control Deck | Backend: [`CONTROL_DECK.md`](CONTROL_DECK.md) | Backend and mock executor done on the PC; firmware screens and a real executor **not built** |
 | M6 Home and automations | none | **Not built** |
-| M7 Oyster AI and voice | our M1 and M5 (agentic investigation): orchestrator, budgets, evidence-linked answers, redaction | M1 part: done on the PC against a fake provider and mocked HTTP; the real Groq run is pending. M5 part: backend orchestrator and fake-provider end-to-end done on the PC; the real Groq run and the device-side M4 are pending. Explicit context sharing: the backend sends redacted, bounded evidence ([`PRIVACY.md`](PRIVACY.md)). Voice: **not built** |
+| M7 Oyster AI and voice | our M1 and M5 (agentic investigation): orchestrator, budgets, evidence-linked answers, redaction | M1 part: done on the PC against a fake provider and mocked HTTP, and in the lab demo against a real Groq model with a simulated device. M5 part: backend orchestrator and end-to-end runs done on the PC; the device-side M4 is pending. Explicit context sharing: the backend sends redacted, bounded evidence ([`PRIVACY.md`](PRIVACY.md)). Voice: **not built** |
 | M8 Quality and documentation | our M6 Reliability and release | Docs and scripts only so far. Host tests and pytest run on the PC, but no reliability test has run: power-interruption, 20-cycle and soak tests need a device. CI: not configured yet |
 | (beyond the design) | our M4 Assessment and collection: access-policy checks, reversible write, diagnostic transfer | Backend and simulator side done; **device side not built** (the device answers `unsupported`) |
 
@@ -169,13 +169,15 @@ Oyster flash contains Oyster, not the original software.
    loads third-party apps.
 2. **Hardware audit.** It has not been done. Until it is, the backup is the only protection.
 3. **Next module.** The design's next step after the security tools is the companion with read-only Linux host
-   health (its M4). The implementation's open work is the device side of assessment (our M4). Which first?
+   health (its M4); the backend side exists with mock adapters. The implementation's open work is the device side
+   of assessment (our M4) and the firmware clients for the companion and the Control Deck.
 4. **Key bindings.** Confirm or change Home, Help and Back on the real keyboard (Settings > Key tester) before
    they are documented as final.
-5. **Real AI run.** Supply a Groq key and model and run `oyster ai-check` and `scripts\demo-m1.ps1`; until then
-   the AI path is proven only with a fake provider and mocked HTTP.
+5. **Real AI run on the device.** The AI path has run against a real Groq model with a simulated device
+   (`oyster ai-check`, `scripts\demo-m1.ps1`); it has not run with the Cardputer. Choose the model by running the
+   demo with it ([`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)).
 6. **Licence and art.** The original code does not declare a license yet ([`../LICENSE-NOTICES.md`](../LICENSE-NOTICES.md)).
-   The art in `assets/` (module icons, logo, boot splash, banner) is AI-generated; see
+   The mascot in `assets/` is the project's own artwork; the module icons, the loader animation's motion reference and the banner background are AI-generated; see
    [`../assets/PROVENANCE.md`](../assets/PROVENANCE.md).
 7. **CI.** The design roadmap (M8) lists linting and tests in CI; none is configured yet
    ([`CI_SUGGESTION.md`](CI_SUGGESTION.md)).

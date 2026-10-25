@@ -53,7 +53,7 @@ The full, honest version is [`CAPABILITY_MATRIX.md`](CAPABILITY_MATRIX.md).
 
 | Area | Simulation route (PC only) | Real Cardputer firmware |
 | --- | --- | --- |
-| AI planning + explanation (real model) | in scope for M1 (real model, explicitly simulated results); end-to-end demo not run yet | relays questions; written, unverified on hardware |
+| AI planning + explanation (real model) | in scope for M1 (real model, explicitly simulated results); the lab demo has run end to end against a real Groq model | relays questions; written, unverified on hardware |
 | Wi-Fi survey | simulated results | written, unverified on hardware |
 | BLE discovery, GATT inspection, profile reads | simulated results | written, unverified on hardware |
 | Access-policy checks, reversible write, diagnostic transfer | simulated results | **not built yet (M4)**: the device answers `unsupported` |
@@ -133,7 +133,7 @@ Not done yet:
 
 - Anything on hardware. No Cardputer has been attached: `firmware-backup.ps1`, `firmware-flash.ps1`,
   `firmware-monitor.ps1` and `provision.ps1` have not run against a device.
-- A real AI call. `demo-m1.ps1` has only been exercised on its stop paths (no provider configured).
+- The AI with the Cardputer. `demo-m1.ps1` has run against a real Groq model, but with a simulated device.
 - The live BLE fixture against a device. `fixture.ps1 check` is read-only and reports what your Bluetooth
   adapter supports; run it on your machine.
 
@@ -170,7 +170,7 @@ and report built from it.
 | `tests/` | Contract, policy, provider, auth/job, recovery and lab tests (pytest) |
 | `examples/` | Sanitized, clearly labelled simulated sessions and sample report |
 | `scripts/` | Windows PowerShell scripts listed above, plus `make_ca_bundle.py`, `gen_lab_profile_header.py` and `gen_assets.py` (converts the art in `assets/` for the firmware) |
-| `assets/` | AI-generated art for the device UI (icons, logo, boot splash) and the README banner, with [`PROVENANCE.md`](../assets/PROVENANCE.md) |
+| `assets/` | Art for the device UI (the mascot, icons, boot splash and loader) and the README banner; all but the mascot is AI-generated; see [`PROVENANCE.md`](../assets/PROVENANCE.md) |
 | `docs/` | Design package (plan, design system, roadmap, audit template) and the implementation docs: integration, UI screen map, setup, architecture, BLE profile, capability matrix, hardware checklist, troubleshooting, build matrix |
 | `_backups/` | Created locally by `firmware-backup.ps1` (flash dumps of your device). Not part of the repository; never commit or share it |
 

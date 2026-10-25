@@ -28,7 +28,7 @@ param(
     [string]$DeviceId = 'sim-cardputer-01',
     [int]$StartupTimeoutSec = 45,
     [switch]$SkipEnrollTarget,
-    # Extra arguments appended to "oyster-sim run" (for example a keep-polling option).
+    # Extra arguments appended to "oyster-sim run" (the script already passes --serve to keep polling).
     [string[]]$SimExtraArgs = @()
 )
 

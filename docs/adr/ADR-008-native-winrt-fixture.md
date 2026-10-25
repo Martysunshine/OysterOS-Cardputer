@@ -2,7 +2,7 @@
 
 **Status:** accepted (2026-10-24)
 
-**Context.** The original plan names Bless as a candidate and allows "a native host API". Checked with
+**Context.** Bless was the first candidate for the fixture; a native host API was the alternative. Checked with
 Python 3.13 and bleak 3.0.2: `bless 0.2.6` imports `bleak_winrt`, which does not exist for Python >= 3.12, so
 `import bless` fails; `bless 0.3.0` on PyPI pins `winrt-*==2.0.0b1`, which conflicts with current bleak and
 has no Python 3.13 wheels. Bless also never sets `ENCRYPTION_AND_AUTHENTICATION_REQUIRED`.

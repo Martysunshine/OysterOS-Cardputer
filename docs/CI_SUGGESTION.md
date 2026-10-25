@@ -18,7 +18,7 @@ Until a pipeline exists, the same checks run locally with:
 | Firmware host tests | Linux (system GCC) or Windows (WinLibs) | `pio test -e native` in `firmware/` | no |
 | Simulation integration | same as backend | start the backend, run the `oyster-sim` scenarios against it with the **fake provider** (labelled `is_fake`), assert report and evidence contracts | no |
 
-The project plan lists the checks these jobs cover: schema validation, wrong owner/device and stale scope
+The checks these jobs would cover are: schema validation, wrong owner/device and stale scope
 rejection, the confirmation gate that cannot be bypassed, idempotent uploads, evidence-citation checks,
 prompt-injection data, budgets, transfer edge cases, JSONL recovery, and the firmware build.
 

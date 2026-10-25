@@ -17,7 +17,7 @@ Third-party components used (each under its own license; see the respective proj
 | pyserial | BSD-3-Clause | backend (USB serial provisioning) |
 | truststore | MIT | backend (OS trust store) |
 | Unity test framework (ThrowTheSwitch) | MIT | firmware host tests |
-| IRremote | see the project repository | firmware |
+| IRremote | MIT | firmware |
 | Bless, Bleak | MIT | lab fixture |
 | esptool (Espressif, bundled with PlatformIO as tool-esptoolpy) | GPL-2.0-or-later | run by `scripts/firmware-backup.ps1`; not distributed here |
 | Pillow | HPND | `simulator/` and `scripts/gen_assets.py` (development tools only; not part of the firmware) |

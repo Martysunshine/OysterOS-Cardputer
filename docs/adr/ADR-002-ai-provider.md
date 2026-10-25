@@ -6,7 +6,7 @@
 OpenAI-compatible HTTP adapter used with **Groq** (`AI_PROVIDER=groq`, base `https://api.groq.com/openai/v1`).
 A `FakeProvider` exists for tests and simulation only and is always labelled `is_fake=true`.
 
-**Why.** The owner chose Groq. Its API is OpenAI-compatible, so the same adapter serves OpenAI, OpenRouter
+**Why.** The project uses Groq. Its API is OpenAI-compatible, so the same adapter serves OpenAI, OpenRouter
 and local servers by changing `AI_BASE_URL`/`AI_MODEL`.
 
 **Consequences.**

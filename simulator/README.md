@@ -62,7 +62,7 @@ response is unverified.
 
 ### Licence attribution for the extracted data
 
-(To be added to `LICENSE-NOTICES.md`.)
+These notices are also listed in `LICENSE-NOTICES.md`.
 
 - `fonts::AsciiFont8x16` (`src/lgfx/Fonts/Ascii8x16.h`, table `FontLib8x16`, file header "ASC16") and the M5GFX shape
   algorithms: M5GFX, Copyright (c) 2021 M5Stack, MIT licence. The table file carries no separate licence text.
