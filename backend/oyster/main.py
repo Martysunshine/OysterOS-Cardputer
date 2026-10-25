@@ -30,9 +30,11 @@ from fastapi import FastAPI
 
 from oyster.api import admin, errors, jobs, runs, sessions, system
 from oyster.auth import AuthThrottle
+from oyster.claude.mount import install as install_claude
 from oyster.companion.mount import install as install_companion
 from oyster.deck.mount import DeckRuntime
 from oyster.deck.mount import install as install_deck
+from oyster.home.mount import install as install_home
 from oyster.jobs.sweeper import ExpirySweeper
 from oyster.settings import Settings
 from oyster.store import Store
@@ -145,6 +147,10 @@ def create_app(
     install_companion(app, **(companion_options or {}))
     # Control Deck (allowlisted jobs with local confirmation): same audience split
     install_deck(app, deck_runtime)
+    # Smart Home (Home Assistant behind an allowlist): same audience split
+    install_home(app)
+    # Claude Code link (yes/no approvals from the device, usage line): same audience split
+    install_claude(app)
     if audience == "loopback" and not settings.admin_token:
         log.warning("OYSTER_ADMIN_TOKEN is empty: owner endpoints will refuse every request")
     return app

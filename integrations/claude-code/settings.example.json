@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["<ABSOLUTE_PATH_TO_REPO>/integrations/claude-code/oyster_hook.py"],
+            "timeout": 110
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python \"<ABSOLUTE_PATH_TO_REPO>/integrations/claude-code/oyster_statusline.py\""
+  }
+}

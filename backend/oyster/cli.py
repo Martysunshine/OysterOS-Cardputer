@@ -213,9 +213,20 @@ def cmd_serve(args: argparse.Namespace) -> int:
     worker = build_worker(store, s)
     app = create_app(s, store=store, worker=worker)
     configs = server_configs(app, s, http_only=args.http_only, log_level=args.log_level)
-    run_servers(configs, app.state.runtime)
+    run_servers(configs, app.state.runtime, on_exit=_stop_claude_waits(app))
     store.close()
     return 0
+
+
+def _stop_claude_waits(app) -> Callable[[], None]:
+    """Ends the Claude Code approvals that are still waiting so a Ctrl+C does not wait for their long poll."""
+
+    def stop() -> None:
+        runtime = getattr(app.state, "claude", None)
+        if runtime is not None:
+            runtime.stop()
+
+    return stop
 
 
 def server_configs(app, s: Settings, *, http_only: bool = False, log_level: str = "info") -> list:
@@ -264,8 +275,9 @@ def server_configs(app, s: Settings, *, http_only: bool = False, log_level: str 
     return configs
 
 
-def run_servers(configs: list, runtime) -> None:
-    """Serve several uvicorn configs in one event loop with one shared shutdown signal."""
+def run_servers(configs: list, runtime, on_exit: Callable[[], None] | None = None) -> None:
+    """Serve several uvicorn configs in one event loop with one shared shutdown signal. `on_exit` runs when
+    the signal arrives, before the listeners are asked to stop."""
     import uvicorn
 
     class _Server(uvicorn.Server):
@@ -276,6 +288,8 @@ def run_servers(configs: list, runtime) -> None:
     servers = [_Server(c) for c in configs]
 
     def _exit(sig, frame):
+        if on_exit is not None:
+            on_exit()
         for srv in servers:
             srv.handle_exit(sig, frame)
 
@@ -292,6 +306,42 @@ def run_servers(configs: list, runtime) -> None:
         runtime.stop()
         for sig, handler in previous.items():
             signal.signal(sig, handler)
+
+
+def _conf_seed_demo(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--id", required=True, help="device id that will see the demo host and the Desk profile")
+    p.add_argument("--host-id", default="this-pc", help="id of the local PC host (default this-pc)")
+    p.add_argument("--services", default="", help="comma-separated Windows services to report (allowlist)")
+    p.add_argument("--no-profile", action="store_true", help="only enrol the host, not the Desk profile")
+    _owner_args(p)
+
+
+@command(
+    "seed-demo",
+    "Enrol this PC as a read-only host and create the Desk profile for a device (backend must be running)",
+    _conf_seed_demo,
+)
+def cmd_seed_demo(args: argparse.Namespace) -> int:
+    from oyster.deck.seed import desk_profile_dict
+
+    s = _settings(args)
+    services = [x.strip() for x in args.services.split(",") if x.strip()]
+    host = {
+        "host_id": args.host_id,
+        "display_name": "This PC",
+        "adapter": "local",
+        "metrics": ["cpu_percent", "mem_used_percent", "disk_used_percent", "uptime_s"],
+        "services": services,
+        "device_ids": [args.id],
+    }
+    r = _call(s, args, "POST", "/v1/admin/hosts", json=host)
+    state = "created" if r.json().get("created") else "updated"
+    print(f"host {args.host_id}: {state} (local adapter, read-only)")
+    if not args.no_profile:
+        profile = desk_profile_dict([args.id], args.host_id)
+        r = _call(s, args, "PUT", "/v1/deck/profiles/desk", json=profile)
+        print(f"profile desk: {r.json().get('result', 'ok')} (slots 1-9 act on host {args.host_id})")
+    return 0
 
 
 def _conf_ca(p: argparse.ArgumentParser) -> None:

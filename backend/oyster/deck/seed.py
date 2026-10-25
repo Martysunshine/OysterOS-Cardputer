@@ -29,21 +29,24 @@ _SLOTS: tuple[tuple[int, str, dict], ...] = (
 )
 
 
+def desk_profile_dict(device_ids: Iterable[str], local_host_id: str = DEFAULT_LOCAL_HOST_ID) -> dict:
+    """The `desk` profile as the JSON body of `PUT /v1/deck/profiles/desk`."""
+    ids = list(dict.fromkeys(device_ids))  # unique, order kept
+    return {
+        "profile_id": DESK_PROFILE_ID,
+        "name": DESK_PROFILE_NAME,
+        "device_ids": ids,
+        "hosts": {local_host_id: {"services": []}},
+        "slots": {
+            str(n): {"label": label, "action": {**action, "host_id": local_host_id}}
+            for n, label, action in _SLOTS
+        },
+    }
+
+
 def desk_profile(device_ids: Iterable[str], local_host_id: str = DEFAULT_LOCAL_HOST_ID) -> Profile:
     """The `desk` profile bound to `device_ids`, acting on the host `local_host_id`."""
-    ids = list(dict.fromkeys(device_ids))  # unique, order kept
-    return load_profile(
-        {
-            "profile_id": DESK_PROFILE_ID,
-            "name": DESK_PROFILE_NAME,
-            "device_ids": ids,
-            "hosts": {local_host_id: {"services": []}},
-            "slots": {
-                str(n): {"label": label, "action": {**action, "host_id": local_host_id}}
-                for n, label, action in _SLOTS
-            },
-        }
-    )
+    return load_profile(desk_profile_dict(device_ids, local_host_id))
 
 
 def ensure_desk_profile(
