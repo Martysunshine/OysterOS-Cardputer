@@ -1,0 +1,74 @@
+{
+  "report_version": "1.0",
+  "session_id": "sess-39bd564a-001",
+  "generated_at": "2026-10-24T20:38:58Z",
+  "source_modes": [
+    "simulated"
+  ],
+  "linked_baseline_session_id": null,
+  "findings": [],
+  "evidence_index": [
+    {
+      "event_id": "evt-000000",
+      "operation": "ble_inspect_gatt",
+      "status": "success",
+      "source_mode": "simulated",
+      "session_id": "sess-39bd564a-001",
+      "target_id": "target-lab-01"
+    },
+    {
+      "event_id": "evt-000001",
+      "operation": "ble_inspect_gatt",
+      "status": "success",
+      "source_mode": "simulated",
+      "session_id": "sess-39bd564a-001",
+      "target_id": "target-lab-01"
+    },
+    {
+      "event_id": "evt-000002",
+      "operation": "ble_inspect_gatt",
+      "status": "success",
+      "source_mode": "simulated",
+      "session_id": "sess-39bd564a-001",
+      "target_id": "target-lab-01"
+    },
+    {
+      "event_id": "evt-000003",
+      "operation": "ble_read_profile_value",
+      "status": "success",
+      "source_mode": "simulated",
+      "session_id": "sess-39bd564a-001",
+      "target_id": "target-lab-01"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "run-ad4e46ee0ecb913c",
+      "status": "succeeded",
+      "question": "Inspect my enrolled BLE sensor and read its public value",
+      "provider": {
+        "name": "fake",
+        "model": null,
+        "is_fake": true
+      },
+      "created_at": "2026-10-24T20:38:53Z",
+      "answer_markdown": "Simulated assistant (FakeProvider, no language model). 2 check(s) ran in this run. See the cited evidence for details.",
+      "cited_evidence_ids": [
+        "evt-000000",
+        "evt-000001",
+        "evt-000002",
+        "evt-000003"
+      ],
+      "limitations": [
+        "Produced by the FakeProvider (tests/simulation only); no language model was used.",
+        "Evidence in this run is simulated (simulated device or fixture), not live radio measurements."
+      ],
+      "error": null
+    }
+  ],
+  "limitations": [
+    "SIMULATED DATA: some or all evidence in this report comes from the software simulator. It validates orchestration, policy evaluation and reporting only; it does not validate radio drivers, pairing interoperability or actual BLE permissions.",
+    "Classifications come from deterministic evaluators against the documented lab profile; AI text explains results but never sets a classification.",
+    "Severity is contextual to the documented profile; a readable attribute alone does not establish impact."
+  ]
+}

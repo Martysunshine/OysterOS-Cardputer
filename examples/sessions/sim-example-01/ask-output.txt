@@ -1,0 +1,20 @@
+run run-ad4e46ee0ecb913c: queued
+  #0 provider_request [tool_call]: Model request 1/6 (~4159 input tokens est.): 1 tool call(s)
+  #1 job ble_inspect_gatt [queued]: Requested GATT discovery on target-lab-01
+status: awaiting_device
+  #2 provider_request [tool_call]: Model request 2/6 (~5183 input tokens est.): 1 tool call(s)
+status: running
+  #3 job ble_read_profile_value [queued]: Requested Read public_sensor on target-lab-01
+status: awaiting_device
+  #4 provider_request [final_answer]: Model request 3/6 (~5517 input tokens est.): 1 tool call(s)
+  #5 final_answer final_answer [valid]: Answer cites 4 evidence id(s)
+status: succeeded
+provider: fake model: None (FAKE PROVIDER - no language model)
+
+Simulated assistant (FakeProvider, no language model). 2 check(s) ran in this run. See the cited evidence for details.
+
+evidence: evt-000000, evt-000001, evt-000002, evt-000003
+source modes: simulated
+limitation: Produced by the FakeProvider (tests/simulation only); no language model was used.
+limitation: Evidence in this run is simulated (simulated device or fixture), not live radio measurements.
+usage: 0 in / 0 out tokens, cost unavailable; actions 2/12, model requests 3/6
