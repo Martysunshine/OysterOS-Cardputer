@@ -1,0 +1,7 @@
+# Oyster Pocket - 8 MB flash, single factory app, no OTA (v1). Total = 0x800000.
+# Name,    Type, SubType,  Offset,   Size
+nvs,       data, nvs,      0x9000,   0x6000
+phy_init,  data, phy,      0xF000,   0x1000
+factory,   app,  factory,  0x10000,  0x500000
+spiffs,    data, spiffs,   0x510000, 0x2E0000
+coredump,  data, coredump, 0x7F0000, 0x10000

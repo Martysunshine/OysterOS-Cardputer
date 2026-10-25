@@ -1,0 +1,8 @@
+{
+  "name": "oyster_core",
+  "version": "0.1.0",
+  "description": "Platform-independent Oyster Pocket logic (policy, evidence encoding, hashing, transfer state machine). No Arduino headers.",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {"flags": ["-std=gnu++17"], "includeDir": "include", "srcDir": "src"}
+}
