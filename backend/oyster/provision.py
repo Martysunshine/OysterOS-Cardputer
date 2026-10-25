@@ -18,12 +18,22 @@ PROTOCOL = "oyster-prov/1"
 BAUD = 115200
 MAX_LINE = 512  # bytes per line, newline excluded (docs/PROVISIONING.md); reference TARGET-ADD is 437
 CA_MAX_BYTES = 4096
+CA_LINE_GAP_S = 0.02  # pause between CA-LINE sends (see send loop)
 REPLY_TIMEOUT_S = 5.0
 DONE_TIMEOUT_S = 15.0
 
 
 class ProvisioningError(RuntimeError):
     pass
+
+
+def _ca_bytes(reply: str) -> int:
+    """The byte count of an `OK ca <bytes>` reply (-1 when the reply has no count)."""
+    parts = reply.split()
+    try:
+        return int(parts[2]) if len(parts) >= 3 else -1
+    except ValueError:
+        return -1
 
 
 def masked(line: str) -> str:
@@ -75,6 +85,10 @@ class SerialLink:
 
     def close(self) -> None:
         self._ser.close()
+
+    def pause(self, seconds: float) -> None:
+        """Short gap between unacknowledged lines (overridable by tests)."""
+        time.sleep(seconds)
 
     def _write(self, line: str, max_line: int) -> None:
         data = line.encode("ascii")
@@ -169,9 +183,20 @@ def provision(link: SerialLink, plan: ProvisionPlan, token_source: Callable[[], 
         if plan.ca_pem is not None:
             # CA-BEGIN/CA-LINE are acknowledged only by the CA-END reply (ERR earlier on failure)
             link.send("CA-BEGIN")
+            expected = 0
             for pem_line in plan.ca_pem.strip().splitlines():
-                link.send(f"CA-LINE {pem_line.strip()}")
-            link.command("CA-END", expect="OK ca")
+                text = pem_line.strip()
+                link.send(f"CA-LINE {text}")
+                expected += len(text) + 1  # the device stores each line plus one newline
+                # USB CDC delivers a burst far faster than the firmware drains its serial buffer; a burst of
+                # 20+ lines lost bytes mid-certificate on a real device, so the lines are paced.
+                link.pause(CA_LINE_GAP_S)
+            reply = link.command("CA-END", expect="OK ca")
+            got = _ca_bytes(reply)
+            if got != expected:
+                raise ProvisioningError(
+                    f"CA-END: the device stored {got} bytes, {expected} were sent (serial data lost; retry)"
+                )
         if plan.set_time:
             link.command(f"SET-TIME {int(time.time())}")
         if plan.clear_targets:
