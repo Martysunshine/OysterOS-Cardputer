@@ -1,0 +1,15 @@
+# Oyster Pocket - 8 MB flash, dual boot: Oyster in ota_0, the owner's original firmware in ota_1. Total = 0x800000.
+# Used only by env:cardputer-adv-dualboot (docs/DUAL_BOOT.md, docs/adr/ADR-009-dual-boot-original-firmware.md).
+# The default env keeps partitions_8mb_noota.csv; switching a device is done with scripts/dualboot-setup.ps1.
+#
+# otadata sits at 0xE000 because PlatformIO writes boot_app0.bin (the initial otadata, "boot ota_0") to 0xE000
+# on every upload. There is no phy_init partition: this Arduino build links the PHY init data into the app.
+# ota_1 is 4 MB, the size of the original firmware's own app slot (its image is about 2.5 MB).
+# spiffs only holds the backend CA (<= 4 KiB) in LittleFS.
+# Name,    Type, SubType,  Offset,   Size
+nvs,       data, nvs,      0x9000,   0x5000
+otadata,   data, ota,      0xE000,   0x2000
+ota_0,     app,  ota_0,    0x10000,  0x3A0000
+ota_1,     app,  ota_1,    0x3B0000, 0x400000
+spiffs,    data, spiffs,   0x7B0000, 0x40000
+coredump,  data, coredump, 0x7F0000, 0x10000

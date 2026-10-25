@@ -24,12 +24,18 @@
 .PARAMETER SkipBackupCheck
   Flash without a verified backup. Prints a warning and waits 5 seconds (Ctrl+C aborts).
 
+.PARAMETER FirmwareEnv
+  Alias -Env. PlatformIO environment to flash: cardputer-adv (default, single app slot) or cardputer-adv-dualboot (Oyster in
+  ota_0 next to the original firmware in ota_1, new partition table; run .\scripts\dualboot-setup.ps1 -Apply
+  first, see docs\DUAL_BOOT.md).
+
 .PARAMETER DryRun
   Print the gate and the upload commands. Touches nothing: no serial port, no flash.
 
 .EXAMPLE
   .\scripts\firmware-backup.ps1 -Port COM5
   .\scripts\firmware-flash.ps1 -Port COM5
+  .\scripts\firmware-flash.ps1 -Port COM5 -Env cardputer-adv-dualboot
 #>
 [CmdletBinding()]
 param(
@@ -38,6 +44,10 @@ param(
     [string]$Port,
 
     [switch]$SkipBackupCheck,
+
+    [ValidateSet('cardputer-adv', 'cardputer-adv-dualboot')]
+    [Alias('Env')]
+    [string]$FirmwareEnv = 'cardputer-adv',
 
     [switch]$DryRun
 )
@@ -48,7 +58,8 @@ $ErrorActionPreference = 'Stop'
 Assert-OysterVenv
 Assert-OysterTool -Path $OysterPio -Hint 'Run .\scripts\setup.ps1 (installs PlatformIO).'
 
-$uploadArgs = @('run', '-e', $OysterFirmwareEnv, '-t', 'upload', '--upload-port', $Port)
+$uploadArgs = @('run', '-e', $FirmwareEnv, '-t', 'upload', '--upload-port', $Port)
+$dualBoot = ($FirmwareEnv -eq 'cardputer-adv-dualboot')
 $backupCmd = ".\scripts\firmware-backup.ps1 -Port $Port"
 
 if ($DryRun) {
@@ -115,7 +126,11 @@ if ($SkipBackupCheck) {
     }
 }
 
-Write-OysterStep "Flashing $Port  (manual step - unverified until run)"
+if ($dualBoot) {
+    Write-OysterNote 'Dual-boot build: new partition table, Oyster goes to ota_0. The original firmware must already be in ota_1'
+    Write-OysterNote '(.\scripts\dualboot-setup.ps1 -Apply); otherwise Home > 6 Original Apps shows "not set up". See docs/DUAL_BOOT.md.'
+}
+Write-OysterStep "Flashing $Port with env $FirmwareEnv  (manual step - unverified until run)"
 Invoke-Native -FilePath $OysterPio -ArgumentList $uploadArgs -WorkingDirectory $OysterFirmwareDir
 
 # PlatformIO ends the upload with a reset over the DTR/RTS lines. With the USB-Serial/JTAG port on Windows
@@ -138,4 +153,5 @@ Write-OysterStep 'Upload finished'
 Write-Host '    If the screen stays dark, unplug the USB cable, switch the Cardputer off, plug it in and switch it on.'
 Write-Host '    Do not open a serial terminal with DTR/RTS asserted: on this USB mode that can reset the chip into its bootloader.'
 Write-Host "    Watch the boot log with: .\scripts\firmware-monitor.ps1 -Port $Port"
+if ($dualBoot) { Write-Host '    Provision the device again (NVS was resized, the LittleFS partition moved): .\scripts\oyster-up.ps1' }
 Write-Host '    Record what you observe in docs/HARDWARE_VERIFICATION.md.'
