@@ -14,7 +14,10 @@
 
 namespace oyster {
 
-enum class RequestKind : uint8_t { WifiSurvey, BleDiscover, InspectGatt, ReadValue, AskOyster, CancelRun, SyncNow, Module };
+enum class RequestKind : uint8_t {
+  WifiSurvey, BleDiscover, InspectGatt, ReadValue, AskOyster, CancelRun, SyncNow, Module,
+  VoiceQuestion,  // record on the microphone and upload for transcription (voice_capture.h)
+};
 
 struct WorkRequest {
   RequestKind kind;

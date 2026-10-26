@@ -34,6 +34,7 @@
 #include "status_led.h"
 #include "telemetry.h"
 #include "ui.h"
+#include "voice_capture.h"
 
 namespace oyster {
 
@@ -190,7 +191,7 @@ constexpr uint8_t kSecCount = sizeof(kSecScreens) / sizeof(kSecScreens[0]);
 
 constexpr uint16_t kWifiMenuCount = 3;
 constexpr uint16_t kBleMenuCount = 3;
-constexpr uint16_t kAskCount = 4;
+constexpr uint16_t kAskCount = 5;
 constexpr uint16_t kSettingsCount = 9;
 const char* const kM4Names[] = {"Access-policy check", "Observe notifications", "Write lab value",
                                 "Diagnostic transfer"};
@@ -1118,7 +1119,7 @@ const char* screen_hint(Screen s, const char** name) {
     case Screen::Targets: *name = "Enrolled Targets"; return "Enter: detail. a: assess the selected target.";
     case Screen::Assess: *name = "Assess"; return "Enter runs the selected check on the enrolled target. , /: target.";
     case Screen::GattTree: *name = "GATT results"; return "Enter: detail of a service or characteristic.";
-    case Screen::AskOyster: *name = "Oyster AI [A10]"; return "Ask a question, read the latest run, cancel it or sync.";
+    case Screen::AskOyster: *name = "Oyster AI [A10]"; return "Type or speak (v) a question, read the latest run, cancel it or sync.";
     case Screen::RunView: *name = "Oyster AI run [A11/A12]"; return "Status and answer pages. ; . scroll.";
     case Screen::Settings: *name = "Settings [P10]"; return "Enter opens an entry. , / adjust the brightness.";
     case Screen::Unavailable: *name = "Unavailable module"; return "This module is not in this build. Back returns.";
@@ -1233,9 +1234,10 @@ void assess_row(uint16_t i, char* out, size_t n) {
 void ask_row(uint16_t i, char* out, size_t n) {
   switch (i) {
     case 0: std::snprintf(out, n, "Ask a question"); break;
-    case 1: std::snprintf(out, n, "Latest AI run"); break;
-    case 2: std::snprintf(out, n, "Cancel AI run"); break;
-    case 3: std::snprintf(out, n, "Sync evidence now"); break;
+    case 1: std::snprintf(out, n, "Speak a question (v)"); break;
+    case 2: std::snprintf(out, n, "Latest AI run"); break;
+    case 3: std::snprintf(out, n, "Cancel AI run"); break;
+    case 4: std::snprintf(out, n, "Sync evidence now"); break;
     default: out[0] = '\0'; break;
   }
 }
@@ -1681,6 +1683,133 @@ void assess_action(uint16_t i) {
   }
 }
 
+// ---- voice question (voice_capture.h) -------------------------------------------------------------------------
+// The recording page is drawn inside Screen::AskOyster while voice::state() is not Idle; the worker posts a
+// BackendStatusChanged event (with the real state) every 500 ms so the page refreshes without a timer here.
+
+bool s_voice_announced = false;  // the LED announcement for the current result was played
+
+bool voice_page_shown() {
+  voice::Status st;
+  voice::status(st);
+  return st.state != voice::State::Idle;
+}
+
+// The question entry, pre-filled for review (Enter sends it like a typed question).
+void open_entry_with_text(const char* text) {
+  open_entry(EntryPurpose::Question);
+  copy_str(s_entry, sizeof(s_entry), text);
+  s_entry_len = std::strlen(s_entry);
+  s_entry_cursor = s_entry_len;
+}
+
+void start_voice_question() {
+  if (!ai_available()) {
+    show_ai_unavailable();
+    return;
+  }
+  if (!s_session_ok) {
+    show_message("!No session",
+                 "No evidence session is open, so the question could not be recorded. "
+                 "Check the SD card, then use Settings > New session.");
+    return;
+  }
+  if (!voice::start()) {
+    toast("Busy - wait or Fn+` to cancel");
+    return;
+  }
+  s_voice_announced = false;
+  mark_all();
+}
+
+// Keys on the recording page. Enter stops early (Recording), reviews (Ready) or leaves (Failed); Back cancels
+// or discards. Other keys are ignored.
+void voice_input(NavEvent e) {
+  voice::Status st;
+  voice::status(st);
+  switch (st.state) {
+    case voice::State::Starting:
+    case voice::State::Recording:
+      if (e == NavEvent::Select) {
+        voice::request_stop();
+        toast("Stopping, transcribing...");
+      } else if (e == NavEvent::Back) {
+        voice::request_cancel();
+        toast("Recording cancelled");
+      }
+      break;
+    case voice::State::Finishing:
+      if (e == NavEvent::Back) {
+        voice::request_cancel();
+        toast("Cancelled; the transcript is dropped");
+      }
+      break;
+    case voice::State::Ready:
+    case voice::State::Failed: {
+      if (e != NavEvent::Select && e != NavEvent::Back) return;
+      char text[cfg::kMaxQuestionLen + 1];
+      bool ok = false;
+      if (!voice::take_result(text, sizeof(text), &ok)) break;
+      if (ok && e == NavEvent::Select) {
+        open_entry_with_text(text);
+      } else if (ok) {
+        toast("Transcript discarded");
+      }
+      break;
+    }
+    default: break;
+  }
+  mark_all();
+}
+
+void render_voice(const voice::Status& st) {
+  char body[300];
+  switch (st.state) {
+    case voice::State::Starting:
+      ui::draw_message("Speak a question", "Starting the microphone and opening the upload...\nDel cancels.");
+      break;
+    case voice::State::Recording: {
+      char bar[12];
+      const unsigned filled = st.level_pct / 10;
+      for (unsigned i = 0; i < 10; ++i) bar[i] = i < filled ? '#' : '.';
+      bar[10] = '\0';
+      std::snprintf(body, sizeof(body),
+                    "Recording  %lu s / %lu s\nLevel [%s] %u%%\nSent %lu KB%s\nEnter: stop and transcribe\nDel: cancel, nothing kept",
+                    static_cast<unsigned long>(st.elapsed_ms / 1000), static_cast<unsigned long>(st.max_ms / 1000), bar,
+                    static_cast<unsigned>(st.level_pct), static_cast<unsigned long>(st.sent_bytes / 1024),
+                    st.dropped ? ", gaps!" : "");
+      ui::draw_message("Speak now", body);
+      break;
+    }
+    case voice::State::Finishing:
+      std::snprintf(body, sizeof(body), "Transcribing...\nSent %lu KB (%lu.%lu s of audio)%s\nWaiting for the backend.\nDel cancels.",
+                    static_cast<unsigned long>(st.sent_bytes / 1024), static_cast<unsigned long>(st.elapsed_ms / 1000),
+                    static_cast<unsigned long>((st.elapsed_ms % 1000) / 100), st.dropped ? "\n!Audio gaps: upload was slow" : "");
+      ui::draw_message("Speak a question", body);
+      break;
+    case voice::State::Ready:
+    case voice::State::Failed: {
+      // The result stays in voice_capture until taken by a key, so this page can be drawn again and again.
+      const bool ok = st.state == voice::State::Ready;
+      if (!s_voice_announced) {
+        s_voice_announced = true;
+        statusled::announce(ok ? statusled::Announce::Notice : statusled::Announce::Failure);
+      }
+      char text[cfg::kMaxQuestionLen + 1];
+      voice::peek_result(text, sizeof(text));
+      if (ok) {
+        std::snprintf(body, sizeof(body), "%s", text);  // the first lines; the entry shows all of it
+        ui::draw_message("Transcript: Enter to review", body);
+      } else {
+        std::snprintf(body, sizeof(body), "%s\nEnter or Del: back to the list.", text);
+        ui::draw_message("!Voice question failed", body);
+      }
+      break;
+    }
+    default: break;
+  }
+}
+
 void ask_action(uint16_t i) {
   switch (i) {
     case 0:
@@ -1690,8 +1819,9 @@ void ask_action(uint16_t i) {
         show_ai_unavailable();
       }
       break;
-    case 1: s_scroll = 0; nav_go(Screen::RunView); break;
-    case 2: {
+    case 1: start_voice_question(); break;
+    case 2: s_scroll = 0; nav_go(Screen::RunView); break;
+    case 3: {
       if (!s_runtime || g_backend.latest_run().run_id[0] == '\0') {
         toast("No AI run to cancel");
         break;
@@ -1699,7 +1829,7 @@ void ask_action(uint16_t i) {
       submit_request(make_request(RequestKind::CancelRun), "Cancel AI run", true);
       break;
     }
-    case 3: submit_request(make_request(RequestKind::SyncNow), "Sync now", true); break;
+    case 4: submit_request(make_request(RequestKind::SyncNow), "Sync now", true); break;
     default: break;
   }
 }
@@ -1968,10 +2098,14 @@ void dispatch(NavEvent e, char c) {
       return;
 
     case Screen::AskOyster:
-      if (e == NavEvent::Back) {
+      if (voice_page_shown()) {
+        voice_input(e);
+      } else if (e == NavEvent::Back) {
         nav_back();
       } else if (e == NavEvent::Select) {
         ask_action(nv.sel);
+      } else if (e == NavEvent::Char && (c == 'v' || c == 'V')) {
+        start_voice_question();
       } else {
         list_move(nv, kAskCount, e);
       }
@@ -2506,10 +2640,17 @@ void render_content(uint32_t now) {
         ui::draw_list(ui::ListModel{"Assess", s_acount, nv.sel, nv.top, assess_row, assess_disabled});
       }
       break;
-    case Screen::AskOyster:
+    case Screen::AskOyster: {
+      voice::Status vs;
+      voice::status(vs);
+      if (vs.state != voice::State::Idle) {
+        render_voice(vs);
+        break;
+      }
       ui::draw_list(ui::ListModel{ai_available() ? "Oyster AI" : "!Oyster AI: unavailable", kAskCount, nv.sel, nv.top,
                                   ask_row});
       break;
+    }
     case Screen::Settings:
       ui::draw_list(ui::ListModel{"Settings", kSettingsCount, nv.sel, nv.top, settings_row});
       break;
@@ -2658,10 +2799,28 @@ void default_footer(char* left, size_t ln, char* right, size_t rn) {
       std::snprintf(left, ln, "Ent:OK Del:Erase");
       std::snprintf(right, rn, "%u/%u", static_cast<unsigned>(s_entry_len), static_cast<unsigned>(s_entry_max));
       break;
+    case Screen::AskOyster: {
+      voice::Status vs;
+      voice::status(vs);
+      switch (vs.state) {
+        case voice::State::Starting:
+        case voice::State::Recording: std::snprintf(left, ln, "Ent:Stop Del:Cancel"); break;
+        case voice::State::Finishing:
+          std::snprintf(left, ln, "Del:Cancel");
+          std::snprintf(right, rn, "transcribing");
+          break;
+        case voice::State::Ready: std::snprintf(left, ln, "Ent:Review Del:Discard"); break;
+        case voice::State::Failed: std::snprintf(left, ln, "Ent:Back Del:Back"); break;
+        default:
+          std::snprintf(left, ln, "Del:Back ?:Help");
+          std::snprintf(right, rn, "Ent:Open");
+          break;
+      }
+      break;
+    }
     case Screen::Security:
     case Screen::WifiSurvey:
     case Screen::BleExplorer:
-    case Screen::AskOyster:
       std::snprintf(left, ln, "Del:Back ?:Help");
       std::snprintf(right, rn, "Ent:Open");
       break;

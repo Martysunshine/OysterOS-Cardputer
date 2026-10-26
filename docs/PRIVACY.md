@@ -43,6 +43,19 @@ sensitive.
   explanation.
 - `oyster ask` sends the admin token only to a loopback backend unless `--allow-remote-admin` is given.
 
+## Voice questions (speech)
+
+When the owner speaks a question instead of typing it (docs/VOICE_INPUT.md):
+
+- The recorded **audio** leaves the device only to the PC backend, and from the backend only to the
+  configured speech provider (Groq by default) for transcription, over TLS. The spoken words become a normal
+  question, so treat what you say as disclosed to that provider exactly like a typed question.
+- The audio is **never stored**: it is not written to the device, the SD card or the backend disk. Uploads
+  live in the backend's memory with a 60-second limit and are deleted as soon as they are transcribed or
+  cancelled. Only the returned text (clipped to 240 characters) is kept, and only once the owner sends it.
+- `AI_API_KEY` is sent only in the `Authorization` header to the speech endpoint and is scrubbed from error
+  messages; it never reaches the device. Leave the key or `AI_SPEECH_MODEL` empty to disable voice input.
+
 ## When web access is on (off by default)
 
 `AI_WEB_ACCESS=on` in `backend\.env` lets the assistant call two more backend tools; details and the exact

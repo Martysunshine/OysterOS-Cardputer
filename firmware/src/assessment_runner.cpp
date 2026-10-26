@@ -37,6 +37,7 @@
 #include "radio_scheduler.h"
 #include "telemetry.h"
 #include "time_sync.h"
+#include "voice_capture.h"
 
 namespace oyster {
 
@@ -969,6 +970,9 @@ void handle_request(WorkRequest& r) {
       // No radio lease here: a module that talks to the backend leases the uplink inside modules::http()
       // for the duration of that one request, so a call that needs no radio (an IR send) is never refused.
       modules::run_call(r.module_id, r.call_id, r.arg);
+      break;
+    case RequestKind::VoiceQuestion:
+      voice::run(sid);  // capture + upload + transcription; leases the uplink per request like the modules
       break;
   }
   s_sync_now.store(true);  // upload the new evidence soon

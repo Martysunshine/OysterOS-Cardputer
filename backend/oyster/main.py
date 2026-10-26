@@ -38,6 +38,7 @@ from oyster.home.mount import install as install_home
 from oyster.jobs.sweeper import ExpirySweeper
 from oyster.settings import Settings
 from oyster.store import Store
+from oyster.voice.mount import install as install_voice
 
 log = logging.getLogger("oyster")
 
@@ -151,6 +152,8 @@ def create_app(
     install_home(app)
     # Claude Code link (yes/no approvals from the device, usage line): same audience split
     install_claude(app)
+    # Voice questions (record on the device, transcribe here): device routes on both listeners
+    install_voice(app)
     if audience == "loopback" and not settings.admin_token:
         log.warning("OYSTER_ADMIN_TOKEN is empty: owner endpoints will refuse every request")
     return app
