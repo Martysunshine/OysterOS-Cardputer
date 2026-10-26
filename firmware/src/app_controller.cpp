@@ -118,7 +118,7 @@ struct ListNav {
   uint16_t top = 0;
 };
 
-enum class EntryPurpose : uint8_t { RoomLabel, Question };
+enum class EntryPurpose : uint8_t { RoomLabel, Question, Module };
 enum class Seen : uint8_t { NoScan, NotSeen, ByAddress, ByUuid, ByName };
 enum class AItem : uint8_t { Target, Inspect, Read, GattResults, LastRead, NotInBuild };
 
@@ -192,7 +192,7 @@ constexpr uint8_t kSecCount = sizeof(kSecScreens) / sizeof(kSecScreens[0]);
 constexpr uint16_t kWifiMenuCount = 3;
 constexpr uint16_t kBleMenuCount = 3;
 constexpr uint16_t kAskCount = 5;
-constexpr uint16_t kSettingsCount = 9;
+constexpr uint16_t kSettingsCount = 10;
 const char* const kM4Names[] = {"Access-policy check", "Observe notifications", "Write lab value",
                                 "Diagnostic transfer"};
 
@@ -1244,15 +1244,21 @@ void ask_row(uint16_t i, char* out, size_t n) {
 
 void settings_row(uint16_t i, char* out, size_t n) {
   switch (i) {
-    case 0: std::snprintf(out, n, "Backend: %s", backend_short()); break;
-    case 1: std::snprintf(out, n, "Brightness: %u/%u", static_cast<unsigned>(s_brightness_idx) + 1, kBrightnessLevels); break;
-    case 2: std::snprintf(out, n, "Storage: %s", to_string(g_board.storage().state)); break;
-    case 3: std::snprintf(out, n, "Diagnostics"); break;
-    case 4: std::snprintf(out, n, "Sync evidence now"); break;
-    case 5: std::snprintf(out, n, "New session"); break;
-    case 6: std::snprintf(out, n, "Keyboard"); break;
-    case 7: std::snprintf(out, n, "Key tester"); break;
-    case 8: std::snprintf(out, n, "About"); break;
+    case 0: {
+      char st[16];
+      modules::tile_status(modules::Id::WifiSetup, st, sizeof(st));
+      std::snprintf(out, n, "Wi-Fi: %s", st[0] ? st : "setup");
+      break;
+    }
+    case 1: std::snprintf(out, n, "Backend: %s", backend_short()); break;
+    case 2: std::snprintf(out, n, "Brightness: %u/%u", static_cast<unsigned>(s_brightness_idx) + 1, kBrightnessLevels); break;
+    case 3: std::snprintf(out, n, "Storage: %s", to_string(g_board.storage().state)); break;
+    case 4: std::snprintf(out, n, "Diagnostics"); break;
+    case 5: std::snprintf(out, n, "Sync evidence now"); break;
+    case 6: std::snprintf(out, n, "New session"); break;
+    case 7: std::snprintf(out, n, "Keyboard"); break;
+    case 8: std::snprintf(out, n, "Key tester"); break;
+    case 9: std::snprintf(out, n, "About"); break;
     default: out[0] = '\0'; break;
   }
 }
@@ -1476,6 +1482,22 @@ void build_target_detail(char* out, size_t n) {
 
 // ---- screen actions ------------------------------------------------------------------------------------
 
+char s_entry_prompt[40] = {};
+bool s_entry_secret = false;
+
+// Entry page of a module: the module's prompt, pre-filled text, limit and masking; the result goes back to
+// modules::entry() and the module decides what to show next.
+void open_module_entry(const modules::PageView& v) {
+  s_entry_purpose = EntryPurpose::Module;
+  copy_str(s_entry_prompt, sizeof(s_entry_prompt), v.entry_prompt[0] ? v.entry_prompt : "Text");
+  s_entry_secret = v.entry_secret;
+  copy_str(s_entry, sizeof(s_entry), v.entry_initial);
+  s_entry_max = v.entry_max < sizeof(s_entry) - 1 ? v.entry_max : sizeof(s_entry) - 1;
+  s_entry_len = std::strlen(s_entry);
+  s_entry_cursor = s_entry_len;
+  nav_go(Screen::TextEntry);
+}
+
 void open_entry(EntryPurpose p) {
   s_entry_purpose = p;
   if (p == EntryPurpose::RoomLabel) {
@@ -1526,6 +1548,14 @@ void submit_entry() {
     copy_str(s_room, sizeof(s_room), text);
     nav_back();
     toast("Room label %s", s_room[0] ? "set" : "cleared");
+    return;
+  }
+  if (s_entry_purpose == EntryPurpose::Module) {
+    nav_back();  // back to the module screen; the module changes its page in entry()
+    modules::entry(s_module, text);
+    volatile char* vz = s_entry;  // may have carried a Wi-Fi password; clear it, not optimised away
+    for (size_t z = 0; z < sizeof(s_entry); ++z) vz[z] = 0;
+    s_entry_len = s_entry_cursor = 0;
     return;
   }
   if (len == 0) {
@@ -1604,6 +1634,15 @@ void refresh_module_view(uint32_t now) {
     s_nav[sidx(Screen::Module)] = ListNav{};
     s_scroll = 0;
     if (s_view.kind == modules::PageKind::Confirm) s_module_guard_until = now + kConfirmGuardMs;
+    if (s_view.kind == modules::PageKind::Entry) open_module_entry(s_view);
+  } else if (s_view.kind == modules::PageKind::Entry && s_cur == Screen::Module) {
+    // Back out of the entry: the module still shows its entry page, so leave that page for it.
+    if (modules::back(s_module)) {
+      modules::view(s_module, s_view);
+      s_view_page = s_view.page_id;
+    } else {
+      nav_back();
+    }
   }
 }
 
@@ -1859,23 +1898,24 @@ void new_session() {
 
 void settings_action(uint16_t i) {
   switch (i) {
-    case 0:
+    case 0: open_module(modules::Id::WifiSetup); break;
+    case 1:
       // Built once on open: the config/CA queries touch NVS and LittleFS.
       load_config();
       build_backend(s_live_body, sizeof(s_live_body));
       show_detail(Screen::Detail, "Backend", nullptr, s_live_body);
       break;
-    case 1: set_brightness_idx((s_brightness_idx + 1) % kBrightnessLevels); break;
-    case 2: show_detail(Screen::Detail, "Storage", build_storage, nullptr); break;
-    case 3: show_detail(Screen::Detail, "Diagnostics", build_diag, nullptr); break;
-    case 4: submit_request(make_request(RequestKind::SyncNow), "Sync now", true); break;
-    case 5: new_session(); break;
-    case 6: show_detail(Screen::Detail, "Keyboard", build_keyboard, nullptr); break;
-    case 7:
+    case 2: set_brightness_idx((s_brightness_idx + 1) % kBrightnessLevels); break;
+    case 3: show_detail(Screen::Detail, "Storage", build_storage, nullptr); break;
+    case 4: show_detail(Screen::Detail, "Diagnostics", build_diag, nullptr); break;
+    case 5: submit_request(make_request(RequestKind::SyncNow), "Sync now", true); break;
+    case 6: new_session(); break;
+    case 7: show_detail(Screen::Detail, "Keyboard", build_keyboard, nullptr); break;
+    case 8:
       s_kt = KeyTestState{};
       nav_go(Screen::KeyTest);
       break;
-    case 8: show_detail(Screen::Detail, "About", build_about, nullptr); break;
+    case 9: show_detail(Screen::Detail, "About", build_about, nullptr); break;
     default: break;
   }
 }
@@ -2114,7 +2154,7 @@ void dispatch(NavEvent e, char c) {
     case Screen::Settings:
       if (e == NavEvent::Back) {
         nav_back();
-      } else if (nv.sel == 1 && (e == NavEvent::Left || e == NavEvent::Right)) {
+      } else if (nv.sel == 2 && (e == NavEvent::Left || e == NavEvent::Right)) {
         set_brightness_idx(static_cast<int>(s_brightness_idx) + (e == NavEvent::Right ? 1 : -1));
       } else if (e == NavEvent::Select) {
         settings_action(nv.sel);
@@ -2734,8 +2774,19 @@ void render_content(uint32_t now) {
       ui::draw_confirm(s_pc.operation, s_pc.target_id, s_pc.effect);
       break;
     case Screen::TextEntry:
-      ui::draw_text_entry(s_entry_purpose == EntryPurpose::RoomLabel ? "Room label" : "Ask Oyster", s_entry,
-                          s_entry_cursor, "Del on empty text: Back");
+      if (s_entry_purpose == EntryPurpose::Module) {
+        char shown[sizeof(s_entry)];
+        if (s_entry_secret) {
+          std::memset(shown, '*', s_entry_len);
+          shown[s_entry_len] = 0;
+        } else {
+          copy_str(shown, sizeof(shown), s_entry);
+        }
+        ui::draw_text_entry(s_entry_prompt, shown, s_entry_cursor, "Del on empty text: Back");
+      } else {
+        ui::draw_text_entry(s_entry_purpose == EntryPurpose::RoomLabel ? "Room label" : "Ask Oyster", s_entry,
+                            s_entry_cursor, "Del on empty text: Back");
+      }
       break;
   }
 }

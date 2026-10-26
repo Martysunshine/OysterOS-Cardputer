@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+#include <atomic>
 #include <cstring>
 
 #include "device_config.h"
@@ -19,6 +20,7 @@ constexpr uint32_t kBackoffMinMs = 5000;
 constexpr uint32_t kBackoffMaxMs = 60000;
 
 bool s_attempting = false;
+std::atomic<bool> s_reconfigure{false};  // set by reconfigure() (any task), acted on in ensure_up()
 uint32_t s_attempt_start_ms = 0;
 uint32_t s_next_try_ms = 0;
 bool s_backoff_active = false;
@@ -74,6 +76,14 @@ bool configured() {
 bool up() { return WiFi.status() == WL_CONNECTED; }
 
 bool ensure_up(uint32_t wait_ms) {
+  if (s_reconfigure.exchange(false)) {
+    // The Wi-Fi credentials changed: drop any association so this attempt re-reads the new SSID.
+    WiFi.disconnect(false, false);
+    s_attempting = false;
+    s_backoff_active = false;
+    s_backoff_ms = 0;
+    s_next_try_ms = 0;  // due() is true immediately
+  }
   if (up()) {
     if (s_attempting || s_backoff_active) on_link_up();
     timesync::start_sntp();
@@ -101,5 +111,7 @@ bool ensure_up(uint32_t wait_ms) {
 int8_t rssi() { return up() ? static_cast<int8_t>(WiFi.RSSI()) : 0; }
 
 uint32_t connect_attempts() { return s_attempts; }
+
+void reconfigure() { s_reconfigure.store(true); }
 
 }  // namespace oyster::net

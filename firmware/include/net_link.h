@@ -17,4 +17,9 @@ bool ensure_up(uint32_t wait_ms);
 int8_t rssi();       // 0 when not associated
 uint32_t connect_attempts();
 
+// Drop the current association and clear the backoff so the next ensure_up() re-reads the provisioned
+// SSID and passphrase. Call after the Wi-Fi credentials change (Settings > Wi-Fi). Any task: the actual
+// disconnect happens on the worker task inside ensure_up(), so this only sets a flag.
+void reconfigure();
+
 }  // namespace oyster::net

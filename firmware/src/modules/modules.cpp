@@ -26,6 +26,7 @@ const Ops* table(Id id) {
     case Id::Deck: return &kDeckOps;
     case Id::SmartHome: return &kSmartHomeOps;
     case Id::Original: return &kOriginalOps;
+    case Id::WifiSetup: return &kWifiSetupOps;
     case Id::Count: break;
   }
   return nullptr;
@@ -120,6 +121,11 @@ bool tick(Id id, uint32_t now_ms) {
 void cancel(Id id) {
   const Ops& o = ops(id);
   if (o.cancel != nullptr) o.cancel();
+}
+
+void entry(Id id, const char* text) {
+  const Ops& o = ops(id);
+  if (o.entry != nullptr) o.entry(text != nullptr ? text : "");
 }
 
 void tile_status(Id id, char* out, size_t n) {

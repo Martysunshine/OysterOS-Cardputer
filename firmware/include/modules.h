@@ -15,7 +15,7 @@
 
 namespace oyster::modules {
 
-enum class Id : uint8_t { Hosts, Deck, SmartHome, Original, Count };
+enum class Id : uint8_t { Hosts, Deck, SmartHome, Original, WifiSetup, Count };
 constexpr uint8_t kCount = static_cast<uint8_t>(Id::Count);
 
 enum class PageKind : uint8_t {
@@ -23,6 +23,8 @@ enum class PageKind : uint8_t {
   Text,     // `body`, scrolled by the UI; Enter calls select(0), Back calls back()
   Confirm,  // operation / target / effect; Enter approves (select(0)), Back rejects (back()); keys are ignored
             // for the first 700 ms after the page appears (a key pressed before it was readable never answers it)
+  Entry,    // text entry: `entry_prompt`, pre-filled with `entry_initial`, at most `entry_max` characters,
+            // masked when `entry_secret`; Enter calls entry(text), Back calls back()
 };
 
 // What the UI draws for the current page. Filled by Ops::view() on every redraw: cheap, no I/O, no allocation.
@@ -38,6 +40,10 @@ struct PageView {
   char confirm_operation[40] = {};
   char confirm_target[40] = {};
   char confirm_effect[96] = {};
+  char entry_prompt[40] = {};
+  char entry_initial[64] = {};
+  uint8_t entry_max = 63;
+  bool entry_secret = false;
   char left[32] = {};   // action strip, "Key:Action ..." (leading '!' = alert style)
   char right[20] = {};
   bool busy = false;    // a backend call is running (the strip shows "working")
@@ -55,6 +61,7 @@ struct Ops {
   void (*cancel)();                                    // emergency cancel pressed while this module is open
   void (*call)(uint8_t call_id, const char* arg);      // runs on the worker task: HTTPS + parsing
   void (*tile_status)(char* out, size_t n);            // Home tile detail line, at most n-1 characters
+  void (*entry)(const char* text);                     // Enter on an Entry page (may be nullptr)
 };
 
 // Implemented in src/modules/*.cpp.
@@ -62,6 +69,7 @@ extern const Ops kHostsOps;
 extern const Ops kDeckOps;
 extern const Ops kSmartHomeOps;
 extern const Ops kOriginalOps;
+extern const Ops kWifiSetupOps;
 
 const Ops& ops(Id id);
 const char* name(Id id);
@@ -106,6 +114,7 @@ bool back(Id id);
 bool key(Id id, NavEvent e, char c);
 bool tick(Id id, uint32_t now_ms);
 void cancel(Id id);
+void entry(Id id, const char* text);
 void run_call(uint8_t module_id, uint8_t call_id, const char* arg);  // worker task
 void tile_status(Id id, char* out, size_t n);
 
