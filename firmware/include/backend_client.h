@@ -17,7 +17,7 @@ const char* to_string(BackendState s);
 struct RunSummary {
   char run_id[cfg::kIdBufLen];
   char status[24];
-  char answer_excerpt[160];
+  char answer_excerpt[1200];  // the device shows this much of the answer (scrollable); the report keeps all of it
   bool has_pending_action;
   char pending_operation[32];
   char pending_target[cfg::kIdBufLen];

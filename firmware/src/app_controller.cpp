@@ -245,7 +245,7 @@ size_t s_entry_max = 0;
 char s_detail_title[40] = {};
 char s_detail_body[900] = {};
 void (*s_detail_builder)(char*, size_t) = nullptr;
-char s_live_body[900] = {};
+char s_live_body[1500] = {};  // run view: status lines + up to 1200 characters of answer
 uint16_t s_scroll = 0;
 uint16_t s_msg_total = 0;
 
@@ -959,7 +959,7 @@ void build_run(char* out, size_t n) {
   }
   if (!s_runtime) return;
   if (s_op.requested) b.add("Question sent; waiting for the backend to start the run.\n\n");
-  RunSummary r;
+  static RunSummary r;  // about 1.5 KB: kept off the UI task stack
   std::memcpy(&r, &g_backend.latest_run(), sizeof(r));  // display copy; may lag the worker by one update
   r.run_id[sizeof(r.run_id) - 1] = '\0';
   r.status[sizeof(r.status) - 1] = '\0';

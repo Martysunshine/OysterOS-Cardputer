@@ -63,6 +63,18 @@ MAX_PROSE_ECHO = 2000
 # A model that keeps answering in plain text (no final_answer tool call) after the repair attempt is
 # accepted as a labelled prose answer, but only once the run has produced real results to talk about.
 MIN_PROSE_ANSWER_CHARS = 40
+# An uncited final_answer with fewer words or characters than this is sent back for one repair round.
+MIN_FINAL_ANSWER_WORDS = 3
+MIN_FINAL_ANSWER_CHARS = 16
+
+
+def _echoes_question(answer: str, question: str | None) -> bool:
+    """True when the answer is just the question again (punctuation and case aside)."""
+    if not question:
+        return False
+    norm = "".join(ch.lower() for ch in answer if ch.isalnum())
+    qnorm = "".join(ch.lower() for ch in question if ch.isalnum())
+    return bool(qnorm) and norm == qnorm
 PROSE_ANSWER_LIMITATION = (
     "The model answered in plain text instead of the structured answer format and cited no evidence ids. "
     "Check its statements against the evaluator findings and the evidence of this run."
@@ -101,6 +113,10 @@ need the owner's local confirmation on the device.
 deterministic evaluator; report its classification and never turn a timeout, a public value or an \
 unsupported check into a finding yourself.
 - Say when evidence is simulated. Mark recommendations based on incomplete measurements as suggestions.
+- Answer in full. A general question gets a complete answer from your knowledge in three to eight \
+sentences of plain markdown, with a line that no measurement was taken. A question about a check gets \
+the result, the evidence ids and the limits. Never answer with a single word or by repeating the \
+question. The handheld shows about 1,200 characters; the report keeps the whole answer.
 - Neighbouring Wi-Fi BSSIDs and BLE addresses are masked (aa:bb:cc:xx:xx:xx#ap-1f3a9): refer to such a \
 device by the alias after the #.
 - final_answer is plain text: no links, images or HTML, and mention only evt-/finding-/job-/run- ids that \
@@ -295,6 +311,7 @@ class Orchestrator:
         profile: dict | None = None,
         max_context_events: int = 40,
         mask_identifiers: bool | None = None,
+        strict_answers: bool | None = None,
     ):
         self.store = store
         self.settings = settings
@@ -310,6 +327,12 @@ class Orchestrator:
             self._sleep = time.sleep
         self.poll_interval_s = poll_interval_s
         self._evaluator = evaluator
+        # Real models sometimes answer a general question with one word. The check that sends such an
+        # answer back for the repair round is on for real providers and off for the scripted fake provider
+        # (tests stub their answers).
+        if strict_answers is None:
+            strict_answers = not getattr(provider, "is_fake", False)
+        self.strict_answers = strict_answers
         self._profile = profile
         self.max_context_events = max_context_events
         # API key, admin token and every *_TOKEN/*_KEY environment value (LAB_FIXTURE_AUTH_TOKEN, ...)
@@ -1255,6 +1278,17 @@ class Orchestrator:
         answer, stripped = guard.sanitize_text(self._scrub(fa.answer_markdown))
         if not answer.strip():
             return False, "answer_markdown is empty"
+        words = len(answer.split())
+        too_short = (words < MIN_FINAL_ANSWER_WORDS or len(answer.strip()) < MIN_FINAL_ANSWER_CHARS) and (
+            not fa.cited_evidence_ids
+        )
+        if self.strict_answers and (too_short or _echoes_question(answer, st.run.question)):
+            # A one-word reply with nothing cited, or the question repeated, is not an answer; the repair
+            # round asks once more. A short answer that cites evidence is left to the evaluator's findings.
+            return False, (
+                "answer_markdown is too short to be an answer: write the full answer in markdown "
+                "(several sentences; what was found or what is known, and its limits)"
+            )
         model_lims, s1 = self._sanitize_all(fa.limitations)
         sugg, s2 = self._sanitize_all(fa.suggestions)
         stripped = stripped or s1 or s2

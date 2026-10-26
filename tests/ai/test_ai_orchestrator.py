@@ -77,6 +77,7 @@ def make_env(
     store.responder = device if device is not None else AutoDevice()
     if budgets is not None:
         settings_over["budgets"] = budgets
+    strict_answers = settings_over.pop("strict_answers", None)  # None: off for the fake provider
     settings = make_settings(tmp_path, **settings_over)
     provider = FakeProvider(script)
     ev = fake_evaluator() if evaluator == "fake" else evaluator
@@ -89,6 +90,7 @@ def make_env(
         sleep=clock.sleep,
         poll_interval_s=0.5,
         evaluator=ev,
+        strict_answers=strict_answers,
     )
     run = store.create_run(sess.session_id, question, provider.capabilities())
     return Env(store, clock, provider, orch, run.run_id, settings)
