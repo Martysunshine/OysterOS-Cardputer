@@ -25,6 +25,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -33,6 +34,7 @@ from dataclasses import dataclass, field
 from oyster.ai import answer_guard as guard
 from oyster.ai import context as ctx
 from oyster.ai import tools as cat
+from oyster.ai.openai_compat import ProviderRequestTooLarge
 from oyster.ai.provider import Provider, ProviderError, ProviderMessage, ProviderResult, ToolSpec
 from oyster.ai.redact import IdentifierMasker, clip, env_secrets, redact_text, send_full_identifiers
 from oyster.contracts import (
@@ -117,6 +119,8 @@ unsupported check into a finding yourself.
 sentences of plain markdown, with a line that no measurement was taken. A question about a check gets \
 the result, the evidence ids and the limits. Never answer with a single word or by repeating the \
 question. The handheld shows about 1,200 characters; the report keeps the whole answer.
+- Run device checks only when the question is about the radio surroundings, a network or an enrolled \
+device. A general or personal question is answered from knowledge without any tool call.
 - Neighbouring Wi-Fi BSSIDs and BLE addresses are masked (aa:bb:cc:xx:xx:xx#ap-1f3a9): refer to such a \
 device by the alias after the #.
 - final_answer is plain text: no links, images or HTML, and mention only evt-/finding-/job-/run- ids that \
@@ -282,6 +286,7 @@ class _State:
     last_invalid: str = ""
     final_notice_sent: bool = False
     token_factor: float = 1.0
+    shrunk: bool = False  # one retry with a smaller context after a provider 413
     citable_sessions: list[str] = field(default_factory=list)  # current + owner-linked baseline
     compared: dict = field(default_factory=dict)  # compared session_id -> event ids its result returned
     compared_findings: set = field(default_factory=set)  # finding ids the compare result showed
@@ -420,6 +425,29 @@ class Orchestrator:
                     result = self.provider.explain_results(messages)
                 else:
                     result = self.provider.propose_action(messages, tools)
+            except ProviderRequestTooLarge as e:
+                # The provider counted more input than our estimate. Calibrate the estimate from its message
+                # when it names the count, shrink the context and try once more; a second 413 ends the run.
+                if st.shrunk:
+                    raise _Finish(
+                        "ai_unavailable",
+                        "AI provider unavailable: " + clip(redact_text(str(e), self._secrets), 300),
+                    ) from e
+                st.shrunk = True
+                counted = re.search(r"Requested (\d+)", str(e))
+                if counted and estimate > 0:
+                    st.token_factor = max(st.token_factor, int(counted.group(1)) / estimate * 1.1)
+                else:
+                    st.token_factor *= 1.5
+                self._step(
+                    st,
+                    "provider_request",
+                    outcome="invalid",
+                    summary="Provider refused the request as too large (HTTP 413); retrying once with a "
+                    f"smaller context (estimate factor {st.token_factor:.2f})",
+                )
+                self._save(st)
+                continue
             except ProviderError as e:
                 raise _Finish(
                     "ai_unavailable",

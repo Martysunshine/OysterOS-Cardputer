@@ -273,6 +273,11 @@ so it can hit that cap.
 - To raise the limits, use a paid tier or another model whose limit is higher (run `oyster ai-check` to see which
   tool-capable models your key can use), or raise `RUN_MAX_DURATION_S` in `backend/.env` so a slow run can finish.
 - Organization identifiers and keys are removed from the stored error text.
+- "Request too large ... please reduce your message size" (HTTP 413) is the same cap hit by one request alone
+  (a question that ran a survey and a discovery carries their results). The backend calibrates its token
+  estimate from the message, shrinks the context and retries once. Set `AI_MAX_INPUT_TOKENS` in `backend/.env`
+  below the tier's per-minute limit (6000 for a 7,000 tokens per minute model) so requests are trimmed before
+  they are sent.
 
 ## AI run ends with "no tool call in the response (empty reply)"
 

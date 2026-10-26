@@ -166,6 +166,10 @@ def usage_from(data: dict) -> Usage:
     )
 
 
+class ProviderRequestTooLarge(ProviderError):
+    """HTTP 413: the request exceeds the provider's input limit for this model or tier."""
+
+
 class ProviderRateLimited(ProviderError):
     """HTTP 429 that was not (or could not be) waited out. retry_after_s is the provider's hint, if any."""
 
@@ -333,6 +337,13 @@ class OpenAICompatProvider(Provider):
                     "provider rate limit (HTTP 429" + (f" {code}" if code else "") + ")" + hint
                     + (f": {message}" if message else ""),
                     retry_after_s=wait,
+                )
+            if resp.status_code == 413:
+                # The provider's per-minute input cap refused the whole request (no retry helps unless the
+                # request shrinks); the orchestrator retries once with a tighter context.
+                raise ProviderRequestTooLarge(
+                    "provider refused the request as too large (HTTP 413)"
+                    + (f" {code}" if code else "") + (f": {message}" if message else "")
                 )
             if resp.status_code == 400 and code == "tool_use_failed":
                 raise _ToolUseFailed(message)
