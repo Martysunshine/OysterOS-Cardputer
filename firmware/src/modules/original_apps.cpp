@@ -1,14 +1,16 @@
-// Home tile 6 "Original Apps": boots the original firmware that scripts/dualboot-setup.ps1 copied into the ota_1
-// slot (docs/DUAL_BOOT.md, ADR-009). Local only: it reads the partition table and the app descriptor in ota_1 and,
-// after a confirmation, points the boot selector (otadata) at ota_1 and restarts. No network, no worker call.
+// Home tile 6 "Original Apps": shows the original firmware kept in the ota_1 slot and how to run it.
 //
-// All of it runs on the UI task. The slot is probed when the module opens (and once for the Home tile), never
-// inside view(); nothing is written before the user approves the confirmation page.
-#include <Arduino.h>
-#include <esp_err.h>
+// In-device booting of the original is NOT possible on this device: the original was built with a newer
+// ESP-IDF (5.x) than Oyster's bootloader (Arduino core, ESP-IDF 4.x), and a 4.x bootloader cannot load a 5.x
+// app, so a boot of ota_1 fails immediately and the bootloader rolls back to Oyster. Two firmwares built on
+// different IDF major versions need different bootloaders, and the chip has only one bootloader slot. The
+// original is therefore run by restoring the full factory image from the PC (scripts/original-restore.ps1),
+// which brings its own bootloader; returning to Oyster is a re-flash. See docs/DUAL_BOOT.md, ADR-009.
+//
+// This module only reads the ota_1 descriptor (to show what is stored) and explains the PC steps. It never
+// writes the boot selector and never restarts. All of it runs on the UI task; the slot is probed on open.
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
-#include <esp_system.h>
 
 #include <cstdio>
 #include <cstring>
@@ -22,34 +24,21 @@ enum class Slot : uint8_t {
   NoLayout,  // no ota_1 partition: the single-slot layout
   Empty,     // ota_1 exists and is blank (all 0xFF)
   Invalid,   // ota_1 holds something that is not an app image
-  Running,   // Oyster itself runs from ota_1 (wrong flash): nothing to switch to
+  Running,   // Oyster itself runs from ota_1 (wrong flash)
   Ready,     // a valid image header and app descriptor
 };
 
-enum class Stage : uint8_t {
-  Info,       // the text page
-  Confirm,    // "Boot original firmware" confirmation
-  Switching,  // approved: the page is painted, then the boot partition is set and the device restarts
-};
-
-constexpr uint32_t kRestartDelayMs = 300;  // lets the "Restarting" page stay on screen
-
 struct Probe {
   Slot slot = Slot::NoLayout;
-  const esp_partition_t* part = nullptr;
   uint8_t first_byte = 0xFF;
   char project[32] = {};
   char version[32] = {};
   char idf[32] = {};
   char date[16] = {};
-  char time[16] = {};
 };
 
 Probe s_probe;
 bool s_probed = false;
-Stage s_stage = Stage::Info;
-bool s_painted = false;  // the Switching page has been drawn once
-char s_error[48] = {};   // why the last attempt did not switch
 
 // Copies descriptor text for the screen: printable ASCII only, so image contents cannot inject line breaks.
 void copy_text(char* dst, size_t n, const char* src, size_t src_n) {
@@ -64,9 +53,9 @@ void copy_text(char* dst, size_t n, const char* src, size_t src_n) {
 void probe() {
   s_probe = Probe{};
   s_probed = true;
-  const esp_partition_t* p = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, nullptr);
+  const esp_partition_t* p =
+      esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, nullptr);
   if (p == nullptr) return;
-  s_probe.part = p;
   const esp_partition_t* run = esp_ota_get_running_partition();
   if (run != nullptr && run->address == p->address) {
     s_probe.slot = Slot::Running;
@@ -91,24 +80,7 @@ void probe() {
   copy_text(s_probe.version, sizeof(s_probe.version), desc.version, sizeof(desc.version));
   copy_text(s_probe.idf, sizeof(s_probe.idf), desc.idf_ver, sizeof(desc.idf_ver));
   copy_text(s_probe.date, sizeof(s_probe.date), desc.date, sizeof(desc.date));
-  copy_text(s_probe.time, sizeof(s_probe.time), desc.time, sizeof(desc.time));
   s_probe.slot = Slot::Ready;
-}
-
-// Runs on the UI task after the approval and after the "switching" page was painted. The image check inside
-// esp_ota_set_boot_partition reads the whole slot, so this blocks for a moment; there is no network involved.
-void apply() {
-  const esp_err_t err = esp_ota_set_boot_partition(s_probe.part);
-  if (err != ESP_OK) {
-    s_stage = Stage::Info;
-    std::snprintf(s_error, sizeof(s_error), "Not switched: %s",
-                  err == ESP_ERR_OTA_VALIDATE_FAILED ? "image check failed" : esp_err_to_name(err));
-    toast("Switch failed");
-    return;
-  }
-  toast("Restarting");
-  delay(kRestartDelayMs);
-  esp_restart();
 }
 
 bool available(const char** why) {
@@ -116,134 +88,56 @@ bool available(const char** why) {
   return true;
 }
 
-void open() {
-  probe();
-  s_stage = Stage::Info;
-  s_painted = false;
-  s_error[0] = '\0';
-}
+void open() { probe(); }
 
-void build_info(PageView& v) {
+void view(PageView& v) {
+  if (!s_probed) probe();
   v.kind = PageKind::Text;
   v.page_id = 0;
-  const char* err_sep = s_error[0] != '\0' ? "\n\n" : "";
+  std::snprintf(v.left, sizeof(v.left), "Del:Back ;.:Scroll");
   switch (s_probe.slot) {
     case Slot::Ready:
       std::snprintf(v.title, sizeof(v.title), "Original firmware");
       std::snprintf(v.body, sizeof(v.body),
-                    "%s%sIn slot ota_1:\n%s\n%s\nBuilt %s %s\nIDF %s\n\nEnter boots it, after a confirmation. "
-                    "A reset should bring Oyster back; if it does not, run scripts/oyster-return.ps1 on the PC.",
-                    s_error, err_sep, s_probe.project, s_probe.version, s_probe.date, s_probe.time, s_probe.idf);
-      std::snprintf(v.left, sizeof(v.left), "Ent:Boot Del:Back ;.:Scroll");
+                    "Kept in a backup slot:\n%s\n%s\nBuilt %s\nIDF %s\n\n"
+                    "It cannot boot from here: it was built with a newer IDF than this device's bootloader, "
+                    "which only loads one firmware.\n\n"
+                    "To run it, on the PC:\n  scripts/original-restore.ps1\n(restores it from your verified "
+                    "backup; it then runs with its own bootloader).\n"
+                    "To return to Oyster:\n  scripts/firmware-flash.ps1",
+                    s_probe.project, s_probe.version, s_probe.date, s_probe.idf);
       return;
-    case Slot::Empty:
-      std::snprintf(v.title, sizeof(v.title), "Original firmware: not set up");
-      std::snprintf(v.body, sizeof(v.body),
-                    "%s%sThe dual-boot layout is installed, but slot ota_1 is empty. "
-                    "On the PC run scripts/dualboot-setup.ps1 -Apply (docs/DUAL_BOOT.md).",
-                    s_error, err_sep);
-      break;
-    case Slot::Invalid:
-      std::snprintf(v.title, sizeof(v.title), "Original firmware: invalid");
-      std::snprintf(v.body, sizeof(v.body),
-                    "%s%sSlot ota_1 holds no valid app image (first byte 0x%02X). "
-                    "On the PC run scripts/dualboot-setup.ps1 -Apply to copy it again (docs/DUAL_BOOT.md).",
-                    s_error, err_sep, static_cast<unsigned>(s_probe.first_byte));
-      break;
     case Slot::Running:
       std::snprintf(v.title, sizeof(v.title), "Original firmware: n/a");
       std::snprintf(v.body, sizeof(v.body),
-                    "%s%sOyster itself runs from slot ota_1, so there is nothing to switch to. "
-                    "Flash the dual-boot build again (docs/DUAL_BOOT.md).",
-                    s_error, err_sep);
-      break;
+                    "Oyster itself runs from the backup slot, so there is nothing stored to restore here. "
+                    "Your original firmware is in the PC backup (scripts/original-restore.ps1).");
+      return;
+    case Slot::Empty:
+    case Slot::Invalid:
     case Slot::NoLayout:
-      std::snprintf(v.title, sizeof(v.title), "Original firmware: not set up");
-      std::snprintf(v.body, sizeof(v.body),
-                    "%s%sThis build has a single app slot, so the original firmware is not kept next to Oyster. "
-                    "On the PC run scripts/dualboot-setup.ps1 and flash the dual-boot build (docs/DUAL_BOOT.md).",
-                    s_error, err_sep);
-      break;
-  }
-  std::snprintf(v.left, sizeof(v.left), "Del:Back ;.:Scroll");
-}
-
-void view(PageView& v) {
-  if (!s_probed) probe();
-  switch (s_stage) {
-    case Stage::Confirm: {
-      v.kind = PageKind::Confirm;
-      v.page_id = 1;
-      std::snprintf(v.title, sizeof(v.title), "Original firmware");
-      std::snprintf(v.confirm_operation, sizeof(v.confirm_operation), "Boot original firmware");
-      // The target row shows 20 characters: the version alone when "ota_1 " plus the version does not fit.
-      if (std::strlen(s_probe.version) + 6 <= 20) {
-        std::snprintf(v.confirm_target, sizeof(v.confirm_target), "ota_1 %s", s_probe.version);
-      } else {
-        std::snprintf(v.confirm_target, sizeof(v.confirm_target), "%s", s_probe.version);
-      }
-      std::snprintf(v.confirm_effect, sizeof(v.confirm_effect),
-                    "Restarts into ota_1. A reset should bring Oyster back, else run oyster-return.ps1");
-      std::snprintf(v.left, sizeof(v.left), "Ent:Boot Del:Cancel");
-      return;
-    }
-    case Stage::Switching:
-      v.kind = PageKind::Text;
-      v.page_id = 2;
+    default:
       std::snprintf(v.title, sizeof(v.title), "Original firmware");
       std::snprintf(v.body, sizeof(v.body),
-                    "Restarting into the original firmware.\n\nTo come back: reset or power-cycle. If Oyster does not "
-                    "return, run scripts/oyster-return.ps1 on the PC.");
-      std::snprintf(v.left, sizeof(v.left), "Please wait");
+                    "Your original Cardputer firmware is kept in the PC backup, not on the device.\n\n"
+                    "To run it, on the PC:\n  scripts/original-restore.ps1\n(restores it from your verified "
+                    "backup).\nTo return to Oyster:\n  scripts/firmware-flash.ps1\n\nSee docs/DUAL_BOOT.md.");
       return;
-    case Stage::Info:
-      break;
-  }
-  build_info(v);
-}
-
-void select(uint16_t row) {
-  (void)row;
-  if (s_stage == Stage::Info) {
-    probe();  // the confirmation names what is in the slot now
-    s_error[0] = '\0';
-    if (s_probe.slot == Slot::Ready) s_stage = Stage::Confirm;
-  } else if (s_stage == Stage::Confirm) {
-    s_stage = Stage::Switching;
-    s_painted = false;
   }
 }
 
-bool back() {
-  if (s_stage == Stage::Confirm) {  // Back rejects
-    s_stage = Stage::Info;
-    return true;
-  }
-  return s_stage == Stage::Switching;  // no leaving between the approval and the restart
-}
+void select(uint16_t row) { (void)row; }
 
-bool tick(uint32_t now_ms) {
-  (void)now_ms;
-  if (s_stage != Stage::Switching) return false;
-  if (!s_painted) {  // the page is drawn after this tick; the blocking work happens on the next one
-    s_painted = true;
-    return true;
-  }
-  apply();
-  return true;
-}
-
-// Emergency cancel drops a pending confirmation or an approval that has not run yet. Once apply() runs it blocks the
-// UI task until the restart, so there is nothing left to cancel.
-void cancel() { s_stage = Stage::Info; }
+bool back() { return false; }
 
 void tile_status(char* out, size_t n) {
   if (!s_probed) probe();
-  std::snprintf(out, n, "%s", s_probe.slot == Slot::Ready ? "ready" : "not set up");
+  std::snprintf(out, n, "%s", s_probe.slot == Slot::Ready ? "on PC" : "backup");
 }
 
 }  // namespace
 
-const Ops kOriginalOps = {"Original Apps", available, open, view, select, back, nullptr, tick, cancel, nullptr, tile_status};
+const Ops kOriginalOps = {"Original Apps", available, open,    view,    select,      back,
+                          nullptr,         nullptr,   nullptr, nullptr, tile_status, nullptr};
 
 }  // namespace oyster::modules

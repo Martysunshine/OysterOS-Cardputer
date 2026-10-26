@@ -1,8 +1,30 @@
 # Dual boot with the original firmware
 
-**Status: written and tested on the PC only. Nothing here has run on a Cardputer ADV.** The sections "What is
-verified" and "What is not verified" are the honest split. Decision record:
-[`adr/ADR-009-dual-boot-original-firmware.md`](adr/ADR-009-dual-boot-original-firmware.md).
+> **Finding (2026-10-26, tested on the real device): in-device dual boot of the original DOES NOT WORK here.**
+> The original firmware was built with ESP-IDF 5.4.2; Oyster's bootloader is the Arduino core's ESP-IDF 4.4.7.
+> A 4.x second-stage bootloader cannot load a 5.x app, so selecting `ota_1` resets immediately and the
+> rollback returns to Oyster (confirmed by booting `ota_1` directly: the device came straight back to Oyster).
+> Two firmwares built on different IDF major versions need different bootloaders, and the chip has one
+> bootloader slot. **The original is therefore run by restoring the full factory image from the PC**
+> (`scripts/original-restore.ps1`), which brings its own bootloader; returning to Oyster is
+> `scripts/firmware-flash.ps1`. The "Original Apps" tile now explains this and never attempts the boot.
+> The `ota_0`/`ota_1` layout below still describes how the original app is kept on the flash for reference;
+> the boot-selector part (`esp_ota_set_boot_partition`, rollback) is retained only as history.
+
+**Status: the layout and scripts are tested on the PC; the in-device boot was tested and does not work (above).**
+Decision record: [`adr/ADR-009-dual-boot-original-firmware.md`](adr/ADR-009-dual-boot-original-firmware.md).
+
+## Running the original firmware (the supported way)
+
+```powershell
+.\scripts\original-restore.ps1 -Port COM5 -DryRun   # read-only: shows the backup it would restore
+.\scripts\original-restore.ps1 -Port COM5           # writes the full factory image; the original then boots
+.\scripts\firmware-flash.ps1 -Port COM5             # back to Oyster OS (a few minutes)
+```
+
+It restores the verified 8 MB backup (`scripts/firmware-backup.ps1` made it) to flash offset `0x0` and
+verifies the chip against it. Oyster is replaced on the chip (reversible: it lives in this repository). While
+the original runs, a restart does **not** return to Oyster; re-flash Oyster to come back.
 
 The default build (`env:cardputer-adv`) is a single-slot image that replaces the original firmware; the Home tile
 "Original Apps" is then only a message. The dual-boot build (`env:cardputer-adv-dualboot`) keeps **Oyster in

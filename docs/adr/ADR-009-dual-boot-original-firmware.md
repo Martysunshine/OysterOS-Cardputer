@@ -1,7 +1,12 @@
 # ADR-009: Dual boot with the original firmware (two OTA slots)
 
-**Status:** proposed (2026-10-25). Becomes accepted when the device trial in
-[`../DUAL_BOOT.md`](../DUAL_BOOT.md) has passed. Until then nothing here is verified on a Cardputer.
+**Status:** **rejected (2026-10-26) for the in-device boot; superseded by a PC full-image restore.** The
+device trial failed: the original firmware (ESP-IDF 5.4.2) cannot be loaded by Oyster's bootloader (Arduino
+core, ESP-IDF 4.4.7), so selecting `ota_1` resets and rolls back to Oyster. Two firmwares on different IDF
+major versions need different bootloaders and the chip has one bootloader slot. The original is now run by
+restoring the full factory image from the verified backup on the PC (`scripts/original-restore.ps1`); the
+"Original Apps" tile explains this and no longer sets the boot partition. See
+[`../DUAL_BOOT.md`](../DUAL_BOOT.md). The two-slot layout below is kept as the record of what was tried.
 
 **Decision.** Add a second build, `env:cardputer-adv-dualboot`, with its own partition table
 (`firmware/partitions_8mb_dualboot.csv`): Oyster in `ota_0`, the original firmware in `ota_1`, `otadata` at
