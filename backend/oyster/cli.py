@@ -606,6 +606,18 @@ def _conf_provision(p: argparse.ArgumentParser) -> None:
     )
     p.add_argument("--no-targets", action="store_true", help="do not change the device's target list")
     p.add_argument(
+        "--ai-model",
+        help="direct-AI model id to store (default: AI_MODEL from backend/.env when the provider is Groq)",
+    )
+    p.add_argument(
+        "--ai-key",
+        help="direct-AI provider key to store (discouraged on the command line; prefer backend/.env)",
+    )
+    p.add_argument("--ai-key-file", help="read the direct-AI provider key from this file")
+    p.add_argument(
+        "--no-ai", action="store_true", help="do not store a direct-AI key or model on the device"
+    )
+    p.add_argument(
         "--allow-long-lines",
         action="store_true",
         help="send TARGET-ADD lines over the documented 512-byte limit (firmware must accept them)",
@@ -639,6 +651,20 @@ def cmd_provision_device(args: argparse.Namespace) -> int:
             store.close()
         else:
             targets = _call(s, args, "GET", "/v1/admin/targets").json()["targets"]
+    # Direct AI (device answers without the backend). The device calls api.groq.com, so only a Groq key is
+    # useful; by default we push the key and model from backend/.env so one bring-up does both.
+    ai_key = ai_model = None
+    if not args.no_ai:
+        if args.ai_key_file:
+            ai_key = Path(args.ai_key_file).read_text(encoding="utf-8").strip()
+        elif args.ai_key:
+            ai_key = args.ai_key.strip()
+        elif s.ai_provider == "groq" and s.ai_api_key:
+            ai_key = s.ai_api_key.strip()
+        if args.ai_model:
+            ai_model = args.ai_model.strip()
+        elif s.ai_provider == "groq" and s.ai_model:
+            ai_model = s.ai_model.strip()
     plan = ProvisionPlan(
         device_id=args.id,
         backend_host=host,
@@ -646,6 +672,8 @@ def cmd_provision_device(args: argparse.Namespace) -> int:
         wifi_ssid=ssid,
         wifi_password=password,
         ca_pem=ca_path.read_text(encoding="ascii"),
+        ai_key=ai_key,
+        ai_model=ai_model,
         targets=targets,
         clear_targets=not args.no_targets,
         max_line=4096 if args.allow_long_lines else MAX_LINE,

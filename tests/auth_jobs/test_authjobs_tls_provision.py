@@ -206,6 +206,28 @@ def test_provisioning_sequence_and_no_secret_in_transcript():
     assert all(len(line.encode()) <= MAX_LINE for line in dev.lines)
 
 
+def test_provisioning_sends_ai_model_and_masks_the_ai_key():
+    dev = FakeDevice()
+    transcript: list[str] = []
+    secret = "gsk_TESTkey0123456789abcdef"
+    plan = _plan(ai_key=secret, ai_model="qwen/qwen3.8-27b")
+    link = SerialLink(dev, echo=transcript.append, reply_timeout_s=0.5)
+    provision(link, plan, lambda: "TOKEN-xyz-0123456789")
+    cmds = [line.split(" ", 1)[0] for line in dev.lines]
+    # The AI settings are staged after the targets and before the token, model first then the secret key.
+    assert cmds.index("SET-AI-MODEL") == cmds.index("TARGET-ADD") + 1
+    assert cmds.index("SET-AI-KEY") == cmds.index("SET-AI-MODEL") + 1
+    assert cmds.index("SET-AI-KEY") < cmds.index("SET-TOKEN")
+    assert "SET-AI-MODEL qwen/qwen3.8-27b" in dev.lines  # the model id is a plain setting
+    text = "\n".join(transcript)
+    assert secret not in text and "SET-AI-KEY ***" in text  # the key is never echoed
+
+
+def test_provisioning_rejects_a_short_ai_key():
+    with pytest.raises(ProvisioningError):
+        provision(SerialLink(FakeDevice(), reply_timeout_s=0.5), _plan(ai_key="short"), lambda: "TOKEN-xyz")
+
+
 def test_ca_lines_are_not_acknowledged_until_ca_end():
     dev = FakeDevice()
     transcript: list[str] = []

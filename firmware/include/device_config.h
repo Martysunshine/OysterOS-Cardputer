@@ -31,6 +31,14 @@ class DeviceConfigStore {
   bool set_wifi_password(const char* pw);
   bool get_wifi_password(char* out, size_t n) const;
 
+  // Direct AI (the device calls the provider itself over Wi-Fi, no backend). The key is a secret; the model
+  // id is a plain setting. ai_key_set() is true once a key is stored.
+  bool set_ai_key(const char* key);
+  bool get_ai_key(char* out, size_t n) const;
+  bool ai_key_set() const;
+  bool set_ai_model(const char* model);
+  bool get_ai_model(char* out, size_t n) const;  // fills a default when unset; always true
+
   // Backend CA PEM lives in LittleFS (/ca/backend_ca.pem) so it rotates without reflashing.
   bool set_ca_pem(const char* pem, size_t len);
   size_t ca_pem_len() const;

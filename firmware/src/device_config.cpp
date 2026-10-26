@@ -30,6 +30,9 @@ constexpr const char* kKeySeed = "time_seed";
 constexpr const char* kKeyToken = "token";
 constexpr const char* kKeyWifiPw = "wifi_pw";
 constexpr const char* kKeyTargets = "targets";
+constexpr const char* kKeyAiKey = "ai_key";
+constexpr const char* kKeyAiModel = "ai_model";
+constexpr const char* kDefaultAiModel = "qwen/qwen3.8-27b";
 
 constexpr const char* kCaDir = "/ca";
 constexpr const char* kCaPath = "/ca/backend_ca.pem";
@@ -183,6 +186,40 @@ bool DeviceConfigStore::set_wifi_password(const char* pw) {
   ensure_mutex();
   Lock l;
   return put_secret(kKeyWifiPw, pw, true);  // "" = open network
+}
+
+bool DeviceConfigStore::set_ai_key(const char* key) {
+  ensure_mutex();
+  Lock l;
+  return put_secret(kKeyAiKey, key, true);  // "" clears it
+}
+
+bool DeviceConfigStore::get_ai_key(char* out, size_t n) const {
+  ensure_mutex();
+  Lock l;
+  return get_str(kKeyAiKey, out, n);
+}
+
+bool DeviceConfigStore::ai_key_set() const {
+  ensure_mutex();
+  Lock l;
+  if (!s_nvs_ok || !s_prefs.isKey(kKeyAiKey)) return false;
+  char probe[8];  // a real key is far longer; a non-empty value copies at least one char into probe
+  return s_prefs.getString(kKeyAiKey, probe, sizeof(probe)) > 0;
+}
+
+bool DeviceConfigStore::set_ai_model(const char* model) {
+  ensure_mutex();
+  Lock l;
+  return put_str(kKeyAiModel, model);
+}
+
+bool DeviceConfigStore::get_ai_model(char* out, size_t n) const {
+  ensure_mutex();
+  Lock l;
+  if (get_str(kKeyAiModel, out, n)) return true;
+  std::snprintf(out, n, "%s", kDefaultAiModel);  // default when unset
+  return true;
 }
 
 bool DeviceConfigStore::get_wifi_password(char* out, size_t n) const {

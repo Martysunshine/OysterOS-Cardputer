@@ -13,7 +13,8 @@ enum class AppEventType : uint8_t {
   BackendStatusChanged,   // a = BackendState
   ConfirmationRequested,  // details via g_runner.pending_confirmation()
   ConfirmationClosed,     // a: 1 approved, 0 rejected, 2 expired
-  RunUpdated,             // AI run changed; UI re-reads latest run
+  RunUpdated,             // backend AI run changed; UI re-reads latest run
+  DirectAiUpdated,        // direct (no-backend) AI request changed; a = DirectAiPhase
   StorageChanged,         // a = SdState
   Toast,                  // text
   ModuleChanged,          // a module's data changed (src/modules): redraw its page and the Home tile

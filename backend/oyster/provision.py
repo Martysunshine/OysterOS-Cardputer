@@ -41,6 +41,8 @@ def masked(line: str) -> str:
     parts = line.split(" ")
     if parts[0] == "SET-TOKEN":
         return "SET-TOKEN ***"
+    if parts[0] == "SET-AI-KEY":
+        return "SET-AI-KEY ***"
     if parts[0] == "SET-WIFI" and len(parts) >= 2:
         return f"SET-WIFI {parts[1]} ***"
     return line
@@ -149,6 +151,8 @@ class ProvisionPlan:
     wifi_ssid: str | None = None
     wifi_password: str | None = None
     ca_pem: str | None = None
+    ai_key: str | None = None     # direct-AI provider key (secret); device answers without the backend
+    ai_model: str | None = None   # direct-AI model id (plain setting)
     targets: list[dict] = field(default_factory=list)
     set_time: bool = True
     clear_targets: bool = True
@@ -166,6 +170,12 @@ def _check_plan(plan: ProvisionPlan) -> None:
         raise ProvisioningError("Wi-Fi SSID and password must be given together")
     if plan.wifi_ssid is not None and not (1 <= len(plan.wifi_ssid.encode("utf-8")) <= 32):
         raise ProvisioningError("Wi-Fi SSID must be 1-32 bytes")
+    if plan.ai_key is not None:
+        if not (8 <= len(plan.ai_key) <= 200) or any(ord(c) <= 0x20 or ord(c) > 0x7E for c in plan.ai_key):
+            raise ProvisioningError("AI key must be 8-200 printable ASCII characters")
+    if plan.ai_model is not None:
+        if not (1 <= len(plan.ai_model) <= 64) or not all(c.isalnum() or c in "/-._" for c in plan.ai_model):
+            raise ProvisioningError("AI model id must be 1-64 chars of letters, digits or / - . _")
 
 
 def provision(link: SerialLink, plan: ProvisionPlan, token_source: Callable[[], str]) -> dict:
@@ -203,6 +213,11 @@ def provision(link: SerialLink, plan: ProvisionPlan, token_source: Callable[[], 
             link.command("TARGETS-CLEAR")
         for t in plan.targets:
             link.command(f"TARGET-ADD {compact_target(t)}", max_line=plan.max_line)
+        # Direct-AI settings: the model id is a plain setting, the key is a secret (masked in the transcript).
+        if plan.ai_model is not None:
+            link.command(f"SET-AI-MODEL {plan.ai_model}")
+        if plan.ai_key is not None:
+            link.command(f"SET-AI-KEY {plan.ai_key}")
         token = token_source()
         link.command(f"SET-TOKEN {token}")
         status = link.command("STATUS")

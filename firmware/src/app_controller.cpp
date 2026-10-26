@@ -363,12 +363,23 @@ void mark_all() { s_dirty_content = s_dirty_footer = s_dirty_status = true; }
 
 bool runner_busy() { return s_runtime && g_runner.busy(); }
 
-// A radio operation (UI- or job-initiated) or a UI request is in flight, per the operation events.
-bool op_in_flight() { return s_op.active || s_op.requested; }
+// A radio operation (UI- or job-initiated) or a UI request is in flight, per the operation events. A direct
+// AI request also holds the worker for its whole duration (up to ~20 s), so it counts as in flight too.
+bool op_in_flight() {
+  return s_op.active || s_op.requested ||
+         (s_runtime && g_runner.direct_ai_phase() == DirectAiPhase::Running);
+}
 
 // Backend reachable and authenticated. This says nothing about the AI provider: a run can still end as
 // ai_unavailable (see latest_run_used_provider).
 bool ai_available() { return s_runtime && g_backend.state() == BackendState::Connected; }
+
+// The device can answer a question directly over its own Wi-Fi (no backend) when a provider key is stored.
+// Used only when the backend is not the AI path, so the backend stays the richer mode whenever it is up.
+bool ai_direct_ready() { return s_runtime && !ai_available() && g_config.ai_key_set(); }
+
+// Oyster AI can answer at all, by either path.
+bool ai_usable() { return ai_available() || ai_direct_ready(); }
 
 // Positive evidence that the latest AI run used a provider: it is running, waiting on a tool, or ended after
 // the model was called. queued/ai_unavailable/failed/cancelled/expired are not evidence of a working provider.
@@ -800,7 +811,11 @@ const char* startup_block(RequestKind kind) {
     return "The BLE stack did not start. BLE operations are disabled; Wi-Fi survey still works. Reboot to retry.";
   }
   if ((s_start_fail & (kStartBackend | kStartConfig)) && backend_kind) {
-    return "The backend client or its settings did not start. Ask Oyster and sync are disabled. Reboot to retry.";
+    // A text question can still be answered directly over the device's own Wi-Fi when a provider key is stored,
+    // so a backend-only startup failure does not block Ask Oyster in that case.
+    if (!(kind == RequestKind::AskOyster && ai_direct_ready())) {
+      return "The backend client or its settings did not start. Ask Oyster and sync are disabled. Reboot to retry.";
+    }
   }
   return nullptr;
 }
@@ -953,9 +968,38 @@ void build_evidence(char* out, size_t n) {
   b.add("Findings are evaluated on the backend (Ask Oyster or the report).");
 }
 
+// The Run view in direct mode (no backend): shows the device's own request to the AI provider.
+void build_run_direct(Body& b) {
+  char model[80];
+  if (!g_config.get_ai_model(model, sizeof(model))) model[0] = '\0';
+  b.add("Oyster AI (direct, no backend)\n");
+  b.add("Model: %s\n\n", model[0] ? model : "(default)");
+  switch (g_runner.direct_ai_phase()) {
+    case DirectAiPhase::Running:
+      b.add("Asking the provider over Wi-Fi...\nThis usually takes a few seconds.");
+      break;
+    case DirectAiPhase::Done:
+    case DirectAiPhase::Failed: {
+      static char txt[1200];
+      g_runner.direct_ai_text(txt, sizeof(txt));
+      b.add("%s", txt[0] ? txt : "(no answer)");
+      break;
+    }
+    case DirectAiPhase::Idle:
+    default:
+      b.add("Type a question to ask the provider directly.\nThis mode is plain Q&A: no evidence or findings "
+            "are used, and nothing is sent to a backend.");
+      break;
+  }
+}
+
 void build_run(char* out, size_t n) {
   Body b = body_of(out, n);
   if (!ai_available()) {
+    if (ai_direct_ready()) {
+      build_run_direct(b);
+      return;
+    }
     b.add("AI unavailable: backend %s.\nNo answer is generated while offline.\n\n",
           s_runtime ? to_string(g_backend.state()) : "not started");
   }
@@ -1527,10 +1571,11 @@ void show_ai_unavailable() {
     show_message("!AI unavailable", why);
     return;
   }
-  char text[240];
+  char text[280];
   std::snprintf(text, sizeof(text),
-                "Backend state: %s.\nNo answer is generated offline. Local surveys still work and their "
-                "evidence is uploaded when the backend is reachable again (until the next reboot).",
+                "Backend state: %s.\nNo AI key is stored, so no answer can be generated offline. Load a "
+                "provider key over USB (oyster-up / provision) to use Oyster AI without the backend. Local "
+                "surveys still work and their evidence uploads when the backend is reachable again.",
                 s_runtime ? to_string(g_backend.state()) : "not started");
   show_message("!AI unavailable", text);
 }
@@ -1564,7 +1609,7 @@ void submit_entry() {
     toast("Type a question first");
     return;
   }
-  if (!ai_available()) {
+  if (!ai_usable()) {
     nav_back();
     show_ai_unavailable();
     return;
@@ -1868,7 +1913,7 @@ void render_voice(const voice::Status& st) {
 void ask_action(uint16_t i) {
   switch (i) {
     case 0:
-      if (ai_available()) {
+      if (ai_usable()) {
         open_entry(EntryPurpose::Question);
       } else {
         show_ai_unavailable();
@@ -2382,6 +2427,19 @@ void handle_event(const AppEvent& ev) {
       s_dirty_footer = s_dirty_status = true;  // the banner follows the latest run status
       break;
     }
+    case AppEventType::DirectAiUpdated: {
+      const DirectAiPhase ph = static_cast<DirectAiPhase>(ev.a);
+      if (ph == DirectAiPhase::Done || ph == DirectAiPhase::Failed) {
+        s_op.requested = false;  // the request is finished; allow another
+        if (s_cur != Screen::RunView) {
+          s_answer_unseen = true;  // blue until the answer is opened
+          statusled::announce(statusled::Announce::Notice);
+        }
+      }
+      if (s_cur == Screen::RunView) s_dirty_content = true;
+      s_dirty_footer = s_dirty_status = true;
+      break;
+    }
     case AppEventType::StorageChanged:
       if (ev.a <= static_cast<uint32_t>(SdState::Full)) toast("SD: %s", to_string(static_cast<SdState>(ev.a)));
       s_dirty_status = true;
@@ -2480,7 +2538,7 @@ void render_message_screen() {
     body = s_live_body;
   } else if (s_cur == Screen::RunView) {
     build_run(s_live_body, sizeof(s_live_body));
-    title = ai_available() ? "Ask Oyster run" : "!Ask Oyster: AI unavailable";
+    title = ai_available() ? "Ask Oyster run" : (ai_direct_ready() ? "Oyster AI (direct)" : "!Ask Oyster: AI unavailable");
     body = s_live_body;
   } else if (s_cur == Screen::Help) {
     build_help(s_live_body, sizeof(s_live_body));
@@ -2703,8 +2761,8 @@ void render_content(uint32_t now) {
         render_voice(vs);
         break;
       }
-      ui::draw_list(ui::ListModel{ai_available() ? "Oyster AI" : "!Oyster AI: unavailable", kAskCount, nv.sel, nv.top,
-                                  ask_row});
+      ui::draw_list(ui::ListModel{ai_available() ? "Oyster AI" : (ai_direct_ready() ? "Oyster AI (direct)" : "!Oyster AI: unavailable"),
+                                  kAskCount, nv.sel, nv.top, ask_row});
       break;
     }
     case Screen::Settings:

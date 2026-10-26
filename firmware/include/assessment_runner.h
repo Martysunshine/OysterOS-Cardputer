@@ -32,6 +32,9 @@ struct WorkRequest {
   char arg[48];           //   module-defined argument text
 };
 
+// State of a direct (no-backend) Oyster AI request. The device calls the provider itself over Wi-Fi.
+enum class DirectAiPhase : uint8_t { Idle, Running, Done, Failed };
+
 struct PendingConfirmation {
   bool active;
   char job_id[cfg::kIdBufLen];
@@ -58,6 +61,11 @@ class AssessmentRunner {
   void set_session(const char* session_id);
   const char* session() const;
   void reload_targets();                     // after provisioning changes
+
+  // Direct AI (no backend): the worker runs the request; the UI reads these to draw the Run view.
+  DirectAiPhase direct_ai_phase() const;
+  // Copies the latest answer (phase Done) or the error text (phase Failed) into `out`; returns its length.
+  size_t direct_ai_text(char* out, size_t n) const;
 };
 
 extern AssessmentRunner g_runner;

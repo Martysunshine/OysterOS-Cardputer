@@ -506,3 +506,27 @@ on-device confirmation for the virtual-LED write (including a timeout and a reje
 5. Home > Help > Enter: the legend shows one coloured dot per row; the colours must match the LED.
 
 **Pass:** every colour and rhythm above is seen; nothing flickers faster than one blink per second.
+
+### HV-37 Direct AI (Oyster AI without the backend)
+
+Oyster AI tile 2 answering a question with no laptop and no backend, by calling Groq directly over the
+device's own Wi-Fi (`firmware/src/direct_ai.cpp`, CA bundle `firmware/include/groq_ca.h`). The wire format
+has 16 host tests; the live request is **unverified** until this is seen on the device. A key must be stored
+first (`SET-AI-KEY`, loaded from `backend/.env` by `oyster-up`, or `provision-device --ai-key-file`).
+
+1. With the backend running, tile 2 reads `Oyster AI`. Stop the backend (`.\scripts\oyster-up.ps1 -Stop`) and
+   wait until the status bar leaves online: tile 2 now reads `Oyster AI (direct)`.
+2. Ask a question (`Ask a question`, type, Enter). The Run view shows `Oyster AI (direct, no backend)`, the
+   model id, and `Asking the provider over Wi-Fi...`. Within a few seconds the answer appears.
+3. Leave the Run view before the answer arrives: the LED blinks blue three times and breathes blue until the
+   answer is opened (as HV-36 step 3, but for the direct run).
+4. Failure paths, each shown as a short message, never a hang: turn the device's Wi-Fi network off (`Wi-Fi
+   lost`/`not connected`); store a wrong key (`server error (HTTP 401)`); the key never appears on the screen
+   or in the serial log.
+5. `STATUS` over USB reports `ai_key_set: true`; the key itself is never printed.
+6. Voice (tile 2, `Ask a question (voice)`) still reports the backend is needed while offline: direct mode is
+   text Q&A only.
+
+**Pass:** steps 1 to 6 behave as written and no key or token is ever shown. The bundled CA is unverified
+against the live host; if step 2 fails with a certificate error, the correct root must be swapped into
+`groq_ca.h` or stored in LittleFS, and this check stays UNVERIFIED until an answer is seen.

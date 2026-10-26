@@ -42,6 +42,8 @@ constexpr size_t kMaxCaBytes = 4096;
 constexpr size_t kMaxReadPerPoll = 512;
 constexpr size_t kMinTokenLen = 16;
 constexpr size_t kMaxTokenLen = 128;
+constexpr size_t kMaxAiKeyLen = 200;    // provider API key (direct AI); a secret, never echoed
+constexpr size_t kMaxAiModelLen = 64;   // provider model id (direct AI)
 
 struct Staged {
   bool device_id_set;
@@ -54,6 +56,10 @@ struct Staged {
   char password[65];
   bool token_set;
   char token[kMaxTokenLen + 1];
+  bool ai_key_set;
+  char ai_key[kMaxAiKeyLen + 1];
+  bool ai_model_set;
+  char ai_model[kMaxAiModelLen + 1];
   bool ca_set;
   bool time_set;
   uint64_t time_seed;
@@ -293,6 +299,45 @@ void cmd_set_token(char* args) {
   reply("OK token");
 }
 
+// Direct-AI provider key (a secret: never echoed). Printable, bounded.
+void cmd_set_ai_key(char* args) {
+  char* key = next_token(args);
+  bool ok = key != nullptr && next_token(args) == nullptr;
+  size_t n = ok ? std::strlen(key) : 0;
+  if (ok && (n < 8 || n > kMaxAiKeyLen)) ok = false;
+  for (size_t i = 0; ok && i < n; ++i) {
+    if (key[i] <= 0x20 || key[i] > 0x7E) ok = false;
+  }
+  if (!ok) {
+    reply("ERR invalid_ai_key expected 8-%u printable characters", static_cast<unsigned>(kMaxAiKeyLen));
+    return;
+  }
+  secure_zero(s_st.ai_key, sizeof(s_st.ai_key));
+  copy_bounded(s_st.ai_key, sizeof(s_st.ai_key), key);
+  s_st.ai_key_set = true;
+  reply("OK ai_key");
+}
+
+void cmd_set_ai_model(char* args) {
+  char* model = next_token(args);
+  bool ok = model != nullptr && next_token(args) == nullptr;
+  size_t n = ok ? std::strlen(model) : 0;
+  if (ok && (n == 0 || n > kMaxAiModelLen)) ok = false;
+  for (size_t i = 0; ok && i < n; ++i) {
+    const char ch = model[i];
+    if (!(std::isalnum(static_cast<unsigned char>(ch)) || ch == '/' || ch == '-' || ch == '.' || ch == '_')) {
+      ok = false;
+    }
+  }
+  if (!ok) {
+    reply("ERR invalid_ai_model expected a model id");
+    return;
+  }
+  copy_bounded(s_st.ai_model, sizeof(s_st.ai_model), model);
+  s_st.ai_model_set = true;
+  reply("OK ai_model %s", s_st.ai_model);
+}
+
 void cmd_ca_begin() {
   secure_zero(s_ca, sizeof(s_ca));
   s_ca_len = 0;
@@ -500,6 +545,7 @@ void cmd_status() {
   }
   w.boolean("wifi_ssid_set", (s_active && s_st.wifi_set) || c.wifi_ssid[0] != '\0');
   w.boolean("token_set", (s_active && s_st.token_set) || stored_token_present());
+  w.boolean("ai_key_set", (s_active && s_st.ai_key_set) || g_config.ai_key_set());
   w.unum("ca_bytes", s_active && s_st.ca_set ? s_ca_len : g_config.ca_pem_len());
   const size_t targets = s_active ? s_st.target_count : g_config.load_targets(s_st.targets, cfg::kMaxEnrolledTargets);
   if (!s_active) std::memset(s_st.targets, 0, sizeof(s_st.targets));
@@ -551,6 +597,8 @@ void cmd_done() {
   const char* failed = nullptr;
   if (!g_config.save(c)) failed = "settings";
   if (failed == nullptr && s_st.token_set && !g_config.set_device_token(s_st.token)) failed = "token";
+  if (failed == nullptr && s_st.ai_key_set && !g_config.set_ai_key(s_st.ai_key)) failed = "ai_key";
+  if (failed == nullptr && s_st.ai_model_set && !g_config.set_ai_model(s_st.ai_model)) failed = "ai_model";
   if (failed == nullptr && s_st.wifi_set && !g_config.set_wifi_password(s_st.password)) failed = "wifi";
   if (failed == nullptr && s_st.ca_set && !g_config.set_ca_pem(s_ca, s_ca_len)) failed = "ca";
   if (failed == nullptr && s_st.targets_touched && !g_config.save_targets(s_st.targets, s_st.target_count)) {
@@ -593,9 +641,9 @@ void handle_line(char* line) {
     cmd_status();
     return;
   }
-  static const char* const kKnown[] = {"SET-ID", "SET-BACKEND", "SET-WIFI", "SET-TOKEN", "CA-BEGIN", "CA-LINE",
-                                       "CA-END", "SET-TIME", "TARGET-ADD", "TARGETS-CLEAR", "DONE", "ABORT",
-                                       "FACTORY-RESET"};
+  static const char* const kKnown[] = {"SET-ID", "SET-BACKEND", "SET-WIFI", "SET-TOKEN", "SET-AI-KEY",
+                                       "SET-AI-MODEL", "CA-BEGIN", "CA-LINE", "CA-END", "SET-TIME", "TARGET-ADD",
+                                       "TARGETS-CLEAR", "DONE", "ABORT", "FACTORY-RESET"};
   bool known = false;
   for (const char* k : kKnown) known = known || std::strcmp(cmd, k) == 0;
   if (!known) {
@@ -615,6 +663,10 @@ void handle_line(char* line) {
     cmd_set_wifi(rest);
   } else if (std::strcmp(cmd, "SET-TOKEN") == 0) {
     cmd_set_token(rest);
+  } else if (std::strcmp(cmd, "SET-AI-KEY") == 0) {
+    cmd_set_ai_key(rest);
+  } else if (std::strcmp(cmd, "SET-AI-MODEL") == 0) {
+    cmd_set_ai_model(rest);
   } else if (std::strcmp(cmd, "CA-BEGIN") == 0) {
     cmd_ca_begin();
   } else if (std::strcmp(cmd, "CA-LINE") == 0) {

@@ -96,6 +96,7 @@ The usual causes are Bluetooth switched off in Windows Settings, or airplane mod
 | Capability | Status | Notes |
 | --- | --- | --- |
 | Real provider (Groq, OpenAI-compatible, tool calls) | backend; needs your key. Ran end to end in the lab demo with a simulated device | `oyster ai-check` picks and records a working model ([ADR-002](adr/ADR-002-ai-provider.md)); it does not prove a whole run completes, so run `scripts/demo-m1.ps1` with the model you choose ([`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)). Free-tier rate limits are retried within a bound |
+| Direct AI on the device (Oyster AI tile 2, no backend) | FW written, unverified | When the backend is not reachable, the device calls Groq itself over its own Wi-Fi (`api.groq.com`, TLS with a bundled root CA, `firmware/src/direct_ai.cpp`; wire format `oyster_core/directai_parse.*`, 16 host tests). Single-turn Q&A only: no evidence, findings or device tool-calling, and voice still needs the backend. The key and model are loaded over USB (`SET-AI-KEY`/`SET-AI-MODEL`, defaulted from `backend/.env` by `oyster-up`). The CA bundle is **unverified against the live host** ([`../firmware/include/groq_ca.h`](../firmware/include/groq_ca.h)); a stored LittleFS CA can override it. The backend path stays the richer mode when connected. Checks: HV-37 |
 | Provider missing or unreachable | run ends `ai_unavailable` | No fabricated answer, no silent provider switch |
 | Fake provider | tests and simulation only | Always labelled `is_fake` |
 | Budgets (12 actions, 6 requests, 180 s, token caps) | enforced in code | |

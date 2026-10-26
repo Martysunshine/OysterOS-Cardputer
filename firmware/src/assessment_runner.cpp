@@ -29,6 +29,7 @@
 #include "evidence_store.h"
 #include "modules.h"
 #include "net_link.h"
+#include "direct_ai.h"
 #include "operations.h"
 #include "oyster_core/clock_policy.h"
 #include "oyster_core/delivery_policy.h"
@@ -129,6 +130,11 @@ bool s_seed_saved = false;
 char s_scratch[cfg::kMaxEventBytes];
 JobSpec s_job;
 WorkRequest s_req;
+
+// Direct-AI (no backend) state. The worker runs the request; the UI reads it through the accessors.
+// The phase is atomic; the text (answer or error) is guarded by s_mu. No lock is held across the request.
+std::atomic<uint8_t> s_direct_phase{static_cast<uint8_t>(DirectAiPhase::Idle)};
+char s_direct_text[1200] = "";
 
 class MuLock {
  public:
@@ -485,6 +491,68 @@ void refresh_run(bool force) {
   if (ok) note_run(rs);
 }
 
+// The device answers a question itself over Wi-Fi, with no backend (direct_ai.cpp). Blocks this worker
+// for the whole request (it is the one network owner); the key is loaded, used, and wiped here and never
+// logged. The answer or a key-free error lands in s_direct_text; the UI reads it through the accessors.
+void ask_direct(const char* question) {
+  s_direct_phase.store(static_cast<uint8_t>(DirectAiPhase::Running));
+  {
+    MuLock l;
+    s_direct_text[0] = '\0';
+  }
+  app_post(AppEventType::DirectAiUpdated, static_cast<uint32_t>(DirectAiPhase::Running));
+
+  char key[256] = "";
+  char model[80] = "";
+  const bool have_key = g_config.get_ai_key(key, sizeof(key)) && key[0] != '\0';
+  if (!g_config.get_ai_model(model, sizeof(model))) model[0] = '\0';
+
+  auto finish = [](DirectAiPhase phase, const char* text) {
+    {
+      MuLock l;
+      copy_bounded(s_direct_text, sizeof(s_direct_text), text != nullptr ? text : "");
+    }
+    s_direct_phase.store(static_cast<uint8_t>(phase));
+    app_post(AppEventType::DirectAiUpdated, static_cast<uint32_t>(phase));
+  };
+
+  if (!have_key) {
+    // Wipe whatever get_ai_key wrote, then report.
+    volatile char* vz = key;
+    for (size_t i = 0; i < sizeof(key); ++i) vz[i] = 0;
+    finish(DirectAiPhase::Failed,
+           "No AI key is stored. Load one over USB (oyster-up / provision), then Oyster AI answers without the backend.");
+    return;
+  }
+
+  directai::Config dc{};
+  dc.host = "api.groq.com";
+  dc.port = 443;
+  dc.path = "/openai/v1/chat/completions";
+  dc.model = model;
+  dc.api_key = key;
+  dc.ca_pem = directai::default_ca_pem();
+  dc.timeout_ms = 0;  // built-in default
+
+  static char answer[1200];
+  static char err[200];
+  answer[0] = '\0';
+  err[0] = '\0';
+  const directai::Status st = directai::ask(dc, question, answer, sizeof(answer), err, sizeof(err));
+
+  // The key never lingers in RAM on this task once the request is done.
+  volatile char* vz = key;
+  for (size_t i = 0; i < sizeof(key); ++i) vz[i] = 0;
+
+  if (st == directai::Status::Ok) {
+    finish(DirectAiPhase::Done, answer[0] != '\0' ? answer : "(the provider returned an empty answer)");
+  } else {
+    char line[240];
+    snprintf(line, sizeof(line), "AI request failed (%s): %s", directai::to_string(st), err[0] != '\0' ? err : "no detail");
+    finish(DirectAiPhase::Failed, line);
+  }
+}
+
 void ask(const char* question) {
   char sid[cfg::kIdBufLen];
   snapshot_session(sid);
@@ -492,8 +560,15 @@ void ask(const char* question) {
     toast("Open a session first");
     return;
   }
-  if (!s_cfg.provisioned) {
-    toast("Not provisioned: AI backend unavailable");
+  // The backend is the richer AI path (evidence + findings) when it is reachable. When it is not, the device
+  // answers directly over its own Wi-Fi if a provider key is stored, so Oyster AI works with no laptop.
+  const bool backend_ready = s_cfg.provisioned && g_backend.state() == BackendState::Connected;
+  if (!backend_ready) {
+    if (g_config.ai_key_set()) {
+      ask_direct(question);
+      return;
+    }
+    toast("Oyster AI unavailable: no backend and no stored key");
     return;
   }
   char run_id[cfg::kIdBufLen] = "";
@@ -1109,5 +1184,20 @@ void AssessmentRunner::set_session(const char* session_id) {
 const char* AssessmentRunner::session() const { return s_session; }
 
 void AssessmentRunner::reload_targets() { s_reload_targets.store(true); }
+
+DirectAiPhase AssessmentRunner::direct_ai_phase() const {
+  return static_cast<DirectAiPhase>(s_direct_phase.load());
+}
+
+size_t AssessmentRunner::direct_ai_text(char* out, size_t n) const {
+  if (out == nullptr || n == 0) return 0;
+  if (s_mu == nullptr) {
+    out[0] = '\0';
+    return 0;
+  }
+  MuLock l;
+  copy_bounded(out, n, s_direct_text);
+  return std::strlen(out);
+}
 
 }  // namespace oyster

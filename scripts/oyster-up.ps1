@@ -217,4 +217,6 @@ Invoke-Native -FilePath $OysterCli -ArgumentList @('seed-demo', '--id', $DeviceI
 Write-OysterStep 'Done'
 Write-OysterNote 'The device restarts. Press any key on its start screen. The Home heading should read OYSTER OS (no "setup!")'
 Write-OysterNote 'and the status bar should turn to BACKEND OK within a few seconds. Then try Oyster AI (tile 2).'
+Write-OysterNote 'Provisioning also loaded the AI key and model from backend/.env, so Oyster AI answers even away'
+Write-OysterNote 'from this PC (tile 2 shows "Oyster AI (direct)" when the backend is not reachable).'
 Write-OysterNote 'Stop the backend later with: .\scripts\oyster-up.ps1 -Stop'
