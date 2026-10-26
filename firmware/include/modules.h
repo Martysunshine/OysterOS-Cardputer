@@ -15,7 +15,7 @@
 
 namespace oyster::modules {
 
-enum class Id : uint8_t { Hosts, Deck, SmartHome, Original, WifiSetup, Count };
+enum class Id : uint8_t { Hosts, Deck, SmartHome, Original, WifiSetup, WifiRecon, Count };
 constexpr uint8_t kCount = static_cast<uint8_t>(Id::Count);
 
 enum class PageKind : uint8_t {
@@ -70,6 +70,7 @@ extern const Ops kDeckOps;
 extern const Ops kSmartHomeOps;
 extern const Ops kOriginalOps;
 extern const Ops kWifiSetupOps;
+extern const Ops kWifiReconOps;
 
 const Ops& ops(Id id);
 const char* name(Id id);

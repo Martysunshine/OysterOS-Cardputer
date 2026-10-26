@@ -192,29 +192,25 @@ def test_every_job_route_has_an_error_state_that_renders_as_an_alert():
         assert s.view().state in ("error",), rt.id
 
 
-def test_disabled_modules_are_greyed_out_on_home_in_the_firmware_profile(sim, preview):
+def test_every_home_tile_is_enabled(sim, preview):
     th = theme()
     sim.render()
     labels = {r.text: r.enabled for r in sim.view().rows}
-    # Hosts (Linux), Control Deck and Smart Home are implemented in the firmware (unverified on a device);
-    # only Original Apps is still a greyed-out tile.
+    # Every module tile is implemented now (tile 3 is the on-device WiFi recon; Original Apps is an
+    # informational tile). None is greyed out, in either profile.
     assert labels == {
         "Security": True,
         "Control": True,
         "Oyster AI": True,
         "SmartHome": True,
-        "Linux": True,
-        "Original": False,
+        "WiFi Scan": True,
+        "Original": True,
         "Settings": True,
         "Help": True,
     }
-    # Same frame, enabled vs disabled tile: the disabled label uses the muted colour and the icon is dimmed.
     preview.render()
     assert all(r.enabled for r in preview.view().rows)
-    # The Original Apps tile (row 2, column 1).
-    cell = (th.PadX + th.InnerW // 2 + 4, th.ContentY + 2 * th.TileH + 4, 100, 24)
+    # An enabled tile label is drawn in the primary text colour, not the muted (disabled) one.
+    cell = (th.PadX + 4, th.ContentY + 4, 100, 24)
     a = sim.ui.screen.image(1).crop((cell[0], cell[1], cell[0] + cell[2], cell[1] + cell[3]))
-    b = preview.ui.screen.image(1).crop((cell[0], cell[1], cell[0] + cell[2], cell[1] + cell[3]))
-    assert a.tobytes() != b.tobytes()
-    assert tuple(th.TextMuted.rgb888) in colour_set(a)
-    assert tuple(th.TextPrimary.rgb888) in colour_set(b)
+    assert tuple(th.TextPrimary.rgb888) in colour_set(a)

@@ -25,7 +25,7 @@ HOME_TILES = (  # (key, label, icon, number, module), row-major as kHome in app_
     ("deck", "Control", "ControlDeck", 4, "deck"),
     ("ai", "Oyster AI", "OysterAi", 2, "ai"),
     ("smart", "SmartHome", "SmartHome", 5, "smart"),
-    ("linux", "Linux", "Linux", 3, "linux"),
+    ("linux", "WiFi Scan", "Wifi", 3, "linux"),
     ("original", "Original", "Apps", 6, "original"),
     ("settings", "Settings", "Settings", 7, "settings"),
     ("help", "Help", None, 8, "system"),
@@ -131,10 +131,10 @@ def generic(sim: Simulator, rt: Route, state: str) -> View:
 def home(sim: Simulator, rt: Route, state: str) -> View:
     rows: list[Row] = []
     for key, label, icon, number, module in HOME_TILES:
-        # Hosts (linux), Control Deck and Smart Home are in the firmware (unverified on a device); here they
-        # run on mock data. Only Original Apps stays greyed out, except in the preview profile.
-        built = module in ("home", "security", "ai", "settings", "system", "linux", "deck", "smart")
-        enabled = built or (sim.preview and state != "disabled")
+        # Every module tile is in the firmware now (tile 3 = on-device WiFi recon; Original Apps = info tile).
+        # All module tiles are enabled; none is greyed out.
+        built_modules = {"home", "security", "ai", "settings", "system", "linux", "deck", "smart", "original"}
+        enabled = module in built_modules or (sim.preview and state != "disabled")
         if key == "security":
             what = "scanning" if sim.task and sim.task.kind in ("wifi", "ble") else "Wi-Fi, BLE"
         elif key == "ai":

@@ -139,7 +139,7 @@ struct OpTrack {
 
 // Home (H01): the OysterOS modules as a 2-column tile grid, row-major. Numbers follow the H01 wireframe
 // (column 1: 1-3, column 2: 4-6), then 7 Settings and 8 Help in a fourth row (scrolled into view).
-enum class HomeItem : uint8_t { Security, ControlDeck, OysterAi, SmartHome, Linux, OriginalApps, Settings, Help };
+enum class HomeItem : uint8_t { Security, ControlDeck, OysterAi, SmartHome, WifiScan, OriginalApps, Settings, Help };
 struct HomeTile {
   HomeItem item;
   uint8_t number;
@@ -151,7 +151,7 @@ const HomeTile kHome[] = {
     {HomeItem::ControlDeck, 4, "Control", assets::IconId::ControlDeck},
     {HomeItem::OysterAi, 2, "Oyster AI", assets::IconId::OysterAi},
     {HomeItem::SmartHome, 5, "SmartHome", assets::IconId::SmartHome},
-    {HomeItem::Linux, 3, "Linux", assets::IconId::Linux},
+    {HomeItem::WifiScan, 3, "WiFi Scan", assets::IconId::Wifi},
     {HomeItem::OriginalApps, 6, "Original", assets::IconId::Apps},
     {HomeItem::Settings, 7, "Settings", assets::IconId::Settings},
     {HomeItem::Help, 8, "Help", assets::IconId::Count},
@@ -1653,7 +1653,7 @@ void home_action(uint8_t idx) {
     case HomeItem::OysterAi: nav_go(Screen::AskOyster); break;
     case HomeItem::Settings: nav_go(Screen::Settings); break;
     case HomeItem::Help: open_help(); break;
-    case HomeItem::Linux: open_module(modules::Id::Hosts); break;
+    case HomeItem::WifiScan: open_module(modules::Id::WifiRecon); break;
     case HomeItem::ControlDeck: open_module(modules::Id::Deck); break;
     case HomeItem::SmartHome: open_module(modules::Id::SmartHome); break;
     case HomeItem::OriginalApps: open_module(modules::Id::Original); break;
@@ -2506,7 +2506,7 @@ void render_home(const ListNav& nv) {
       case HomeItem::OysterAi: what = backend_short(); break;
       case HomeItem::Settings: what = "device"; break;
       case HomeItem::Help: what = "keys"; break;
-      case HomeItem::Linux: mod = modules::Id::Hosts; has_mod = true; break;
+      case HomeItem::WifiScan: mod = modules::Id::WifiRecon; has_mod = true; break;
       case HomeItem::ControlDeck: mod = modules::Id::Deck; has_mod = true; break;
       case HomeItem::SmartHome: mod = modules::Id::SmartHome; has_mod = true; break;
       case HomeItem::OriginalApps: mod = modules::Id::Original; has_mod = true; break;

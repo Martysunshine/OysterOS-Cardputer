@@ -27,6 +27,7 @@ const Ops* table(Id id) {
     case Id::SmartHome: return &kSmartHomeOps;
     case Id::Original: return &kOriginalOps;
     case Id::WifiSetup: return &kWifiSetupOps;
+    case Id::WifiRecon: return &kWifiReconOps;
     case Id::Count: break;
   }
   return nullptr;
