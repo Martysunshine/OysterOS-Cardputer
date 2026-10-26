@@ -186,7 +186,9 @@ const char* to_string(SdState s) {
 bool BoardSupport::begin() {
   auto cfg = M5.config();
   cfg.serial_baudrate = 0;   // Serial (HWCDC) is configured in main.cpp
-  cfg.internal_mic = false;  // audio is not used in this build
+  // The ES8311 microphone is used by the voice question (voice_capture.h). M5.begin() only configures the
+  // pins and the private enable callback; no I2S or task runs until voice_capture calls M5.Mic.begin().
+  cfg.internal_mic = true;
   cfg.internal_spk = false;
   cfg.internal_imu = false;
   cfg.internal_rtc = false;
