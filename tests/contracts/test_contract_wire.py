@@ -26,6 +26,7 @@ def _settings(tmp_path) -> Settings:
         ai_api_key="",
         ai_timeout_s=5,
         ai_max_input_tokens=12000,
+        ai_max_context_events=40,
         ai_max_output_tokens=1500,
         ai_price_input_per_mtok=None,
         ai_price_output_per_mtok=None,

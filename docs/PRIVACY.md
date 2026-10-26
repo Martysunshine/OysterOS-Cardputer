@@ -43,6 +43,26 @@ sensitive.
   explanation.
 - `oyster ask` sends the admin token only to a loopback backend unless `--allow-remote-admin` is given.
 
+## When web access is on (off by default)
+
+`AI_WEB_ACCESS=on` in `backend\.env` lets the assistant call two more backend tools; details and the exact
+limits are in [`WEB_ACCESS.md`](WEB_ACCESS.md). With the line absent or `off`, nothing below happens.
+
+- **To the search provider** (Brave Search over HTTPS, key in a request header): the model's search query
+  after redaction (configured secrets and credential-looking strings, e-mail addresses, IPv4 addresses, MAC
+  addresses and every SSID observed in the session are replaced by `[redacted]`) and the result count. The
+  query is written by the model from the conversation, so treat it as derived from your question. The backend
+  logs the query's length only. The provider's own data handling applies to what it receives.
+- **To fetched sites** (http/https): one GET for the URL the model chose, usually a search result, with a fixed
+  User-Agent and no cookies or credentials. The site learns your public IP address and the URL, like any browser
+  visit. Private, loopback and link-local addresses are refused, so the backend, the Cardputer, Home Assistant
+  and anything else on your LAN cannot be reached this way.
+- **Back to the AI provider**: the search results (title, domain, URL, snippet) and the fetched page text (bounded)
+  become tool results of the run, so they are sent to the AI provider like other evidence, labelled as untrusted
+  internet content. Run records store the result summaries (domain, lengths, error codes), never the key.
+- **Never sent**: `WEB_SEARCH_API_KEY` (scrubbed like every `*_KEY` value), session evidence, identifiers or
+  the AI key to a search provider or a web site.
+
 ## Local files worth knowing about
 
 - The simulator's `*.withheld.sealed` file (written next to the session file for the `withheld` scenario)

@@ -1,7 +1,7 @@
 """Backend configuration, loaded from environment / backend/.env (see .env.example).
 
-Secrets (AI_API_KEY, OYSTER_ADMIN_TOKEN, LAB_FIXTURE_AUTH_TOKEN) are read here and never logged;
-the Settings repr omits them.
+Secrets (AI_API_KEY, OYSTER_ADMIN_TOKEN, LAB_FIXTURE_AUTH_TOKEN, WEB_SEARCH_API_KEY) are read here and
+never logged; the Settings repr omits them.
 """
 
 from __future__ import annotations
@@ -63,9 +63,18 @@ class Settings:
     ai_api_key: str = field(repr=False)
     ai_timeout_s: int
     ai_max_input_tokens: int
+    ai_max_context_events: int
     ai_max_output_tokens: int
     ai_price_input_per_mtok: float | None
     ai_price_output_per_mtok: float | None
+    # Web access for the assistant (docs/WEB_ACCESS.md, ADR-010). Off by default: nothing leaves the PC
+    # for a search provider or a web page unless the owner sets AI_WEB_ACCESS=on in backend/.env.
+    ai_web_access: bool = False
+    web_search_provider: str = "brave"
+    web_search_api_key: str = field(default="", repr=False)
+    web_fetch_max_chars: int = 6000
+    web_timeout_s: int = 8
+    web_max_calls_per_run: int = 4
     budgets: RunBudgets = field(default_factory=RunBudgets)
     run_limits: RunLimits = field(default_factory=RunLimits)
 
@@ -106,9 +115,16 @@ def load_settings(env_file: str | os.PathLike | None = None) -> Settings:
         ai_api_key=os.getenv("AI_API_KEY", ""),
         ai_timeout_s=_int("AI_TIMEOUT_S", 60),
         ai_max_input_tokens=_int("AI_MAX_INPUT_TOKENS", 12000),
+        ai_max_context_events=_int("AI_MAX_CONTEXT_EVENTS", 40),
         ai_max_output_tokens=_int("AI_MAX_OUTPUT_TOKENS", 1500),
         ai_price_input_per_mtok=_float_or_none("AI_PRICE_INPUT_PER_MTOK"),
         ai_price_output_per_mtok=_float_or_none("AI_PRICE_OUTPUT_PER_MTOK"),
+        ai_web_access=_bool("AI_WEB_ACCESS", False),
+        web_search_provider=os.getenv("WEB_SEARCH_PROVIDER", "brave").strip().lower(),
+        web_search_api_key=os.getenv("WEB_SEARCH_API_KEY", ""),
+        web_fetch_max_chars=_int("WEB_FETCH_MAX_CHARS", 6000),
+        web_timeout_s=_int("WEB_TIMEOUT_S", 8),
+        web_max_calls_per_run=_int("WEB_MAX_CALLS_PER_RUN", 4),
         budgets=RunBudgets(
             max_actions=_int("RUN_MAX_ACTIONS", 12),
             max_provider_requests=_int("RUN_MAX_PROVIDER_REQUESTS", 6),

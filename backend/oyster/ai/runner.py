@@ -82,6 +82,7 @@ class RunWorker:
             self.provider,
             stop_event=self._stop,
             poll_interval_s=self.poll_interval_s,
+            max_context_events=self.settings.ai_max_context_events,
         )
 
     def start(self) -> None:
