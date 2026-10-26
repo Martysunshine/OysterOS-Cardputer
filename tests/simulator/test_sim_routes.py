@@ -203,7 +203,7 @@ def test_every_home_tile_is_enabled(sim, preview):
         "Control": True,
         "Oyster AI": True,
         "SmartHome": True,
-        "WiFi Scan": True,
+        "Red Team": True,
         "Original": True,
         "Settings": True,
         "Help": True,

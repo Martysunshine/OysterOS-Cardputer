@@ -139,7 +139,7 @@ struct OpTrack {
 
 // Home (H01): the OysterOS modules as a 2-column tile grid, row-major. Numbers follow the H01 wireframe
 // (column 1: 1-3, column 2: 4-6), then 7 Settings and 8 Help in a fourth row (scrolled into view).
-enum class HomeItem : uint8_t { Security, ControlDeck, OysterAi, SmartHome, WifiScan, OriginalApps, Settings, Help };
+enum class HomeItem : uint8_t { Security, ControlDeck, OysterAi, SmartHome, RedTeam, OriginalApps, Settings, Help };
 struct HomeTile {
   HomeItem item;
   uint8_t number;
@@ -151,7 +151,7 @@ const HomeTile kHome[] = {
     {HomeItem::ControlDeck, 4, "Control", assets::IconId::ControlDeck},
     {HomeItem::OysterAi, 2, "Oyster AI", assets::IconId::OysterAi},
     {HomeItem::SmartHome, 5, "SmartHome", assets::IconId::SmartHome},
-    {HomeItem::WifiScan, 3, "WiFi Scan", assets::IconId::Wifi},
+    {HomeItem::RedTeam, 3, "Red Team", assets::IconId::Count},
     {HomeItem::OriginalApps, 6, "Original", assets::IconId::Apps},
     {HomeItem::Settings, 7, "Settings", assets::IconId::Settings},
     {HomeItem::Help, 8, "Help", assets::IconId::Count},
@@ -189,7 +189,7 @@ const Screen kSecScreens[] = {Screen::WifiSurvey, Screen::BleExplorer, Screen::E
                               Screen::Assess};
 constexpr uint8_t kSecCount = sizeof(kSecScreens) / sizeof(kSecScreens[0]);
 
-constexpr uint16_t kWifiMenuCount = 3;
+constexpr uint16_t kWifiMenuCount = 4;
 constexpr uint16_t kBleMenuCount = 3;
 constexpr uint16_t kAskCount = 5;
 constexpr uint16_t kSettingsCount = 10;
@@ -574,6 +574,7 @@ void show_detail(Screen s, const char* title, void (*builder)(char*, size_t), co
 }
 
 void show_message(const char* title, const char* body) { show_detail(Screen::Message, title, nullptr, body); }
+void open_module(modules::Id id);  // defined below; used by the Security Wi-Fi menu
 
 void list_move(ListNav& n, uint16_t count, NavEvent e) {
   if (count == 0) {
@@ -1180,7 +1181,8 @@ void wifi_menu_row(uint16_t i, char* out, size_t n) {
   switch (i) {
     case 0: std::snprintf(out, n, "Start survey (passive)"); break;
     case 1: std::snprintf(out, n, "Results (%u)", static_cast<unsigned>(s_count_wifi)); break;
-    case 2: std::snprintf(out, n, "Room: %s", s_room[0] ? s_room : "(none)"); break;
+    case 2: std::snprintf(out, n, "Live scan (wardrive)"); break;
+    case 3: std::snprintf(out, n, "Room: %s", s_room[0] ? s_room : "(none)"); break;
     default: out[0] = '\0'; break;
   }
 }
@@ -1586,7 +1588,8 @@ void wifi_menu_action(uint16_t i) {
       break;
     }
     case 1: nav_go(Screen::WifiResults); break;
-    case 2: open_entry(EntryPurpose::RoomLabel); break;
+    case 2: open_module(modules::Id::WifiRecon); break;
+    case 3: open_entry(EntryPurpose::RoomLabel); break;
     default: break;
   }
 }
@@ -1646,6 +1649,19 @@ void refresh_module_view(uint32_t now) {
   }
 }
 
+// Home tile 3. Oyster is a recon and defensive companion; it does not include tools that disrupt or
+// deceive devices and people the owner does not own. Offensive security-research firmware for this board
+// exists as separate projects the owner can flash themselves; it is not part of Oyster.
+void show_redteam_info() {
+  show_message("Red Team",
+               "Oyster is a recon and defensive companion.\n\nIt does not include tools that knock other "
+               "devices offline or trick people into giving up credentials: those harm bystanders who did "
+               "not consent, so they are out of scope here.\n\nThe tools that are here work on your own "
+               "networks and devices: Wi-Fi survey and live scan, Bluetooth explorer, enrolled-target "
+               "assessment, IR. Dedicated offensive firmware for this board exists as separate projects you "
+               "can flash yourself.");
+}
+
 void home_action(uint8_t idx) {
   if (idx >= kHomeCount) return;
   switch (kHome[idx].item) {
@@ -1653,7 +1669,7 @@ void home_action(uint8_t idx) {
     case HomeItem::OysterAi: nav_go(Screen::AskOyster); break;
     case HomeItem::Settings: nav_go(Screen::Settings); break;
     case HomeItem::Help: open_help(); break;
-    case HomeItem::WifiScan: open_module(modules::Id::WifiRecon); break;
+    case HomeItem::RedTeam: show_redteam_info(); break;
     case HomeItem::ControlDeck: open_module(modules::Id::Deck); break;
     case HomeItem::SmartHome: open_module(modules::Id::SmartHome); break;
     case HomeItem::OriginalApps: open_module(modules::Id::Original); break;
@@ -2506,7 +2522,7 @@ void render_home(const ListNav& nv) {
       case HomeItem::OysterAi: what = backend_short(); break;
       case HomeItem::Settings: what = "device"; break;
       case HomeItem::Help: what = "keys"; break;
-      case HomeItem::WifiScan: mod = modules::Id::WifiRecon; has_mod = true; break;
+      case HomeItem::RedTeam: what = "info"; break;
       case HomeItem::ControlDeck: mod = modules::Id::Deck; has_mod = true; break;
       case HomeItem::SmartHome: mod = modules::Id::SmartHome; has_mod = true; break;
       case HomeItem::OriginalApps: mod = modules::Id::Original; has_mod = true; break;
