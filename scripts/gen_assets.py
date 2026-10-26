@@ -90,6 +90,7 @@ ICON_SOURCES = [
     ("Findings", "sheet_alt_v1.png", 0, 0),
     ("Targets", "sheet_features_v1.png", 1, 1),
     ("Assess", "sheet_features_v1.png", 1, 2),
+    ("RedTeam", "@skull", 0, 0),  # procedural red skull (no source art); see make_skull_tile
 ]
 
 
@@ -247,6 +248,57 @@ def make_mascot_tile(size: int) -> list[int]:
     opaque = [c for c in cells if c is not None]
     palette = [BG] + reduce_palette(opaque, MAX_COLOURS - 1)
     return [TRANSPARENT if c is None else rgb565(*nearest(c, palette)) for c in cells]
+
+
+# ---- procedural red skull (Red Team tile; no source art) --------------------------------------------
+
+
+def make_skull_tile(size: int) -> list[int]:
+    """A bold flat red skull drawn with primitives: cranium + jaw filled red, eye sockets, nose and a few
+    tooth gaps keyed out so the tile background shows through. Antialiased at 6x then area-averaged down;
+    edges blend towards PANEL, outside the silhouette is the transparent key. No external art."""
+    red: Rgb = (0xE0, 0x40, 0x4A)
+    s = 6
+    w = size * s
+    cx = w / 2
+    m = w * 0.11
+    top = m
+    cran_w = w - 2 * m
+    cran_h = w * 0.56
+    jaw_w = cran_w * 0.60
+    jaw_top = top + cran_h * 0.70
+    jaw_h = w * 0.30
+
+    solid = Image.new("L", (w, w), 0)
+    sd = ImageDraw.Draw(solid)
+    sd.rounded_rectangle([cx - cran_w / 2, top, cx + cran_w / 2, top + cran_h], radius=cran_w * 0.46, fill=255)
+    sd.rounded_rectangle([cx - jaw_w / 2, jaw_top, cx + jaw_w / 2, jaw_top + jaw_h], radius=jaw_w * 0.34, fill=255)
+
+    holes = Image.new("L", (w, w), 0)
+    hd = ImageDraw.Draw(holes)
+    eye_r = cran_w * 0.19
+    eye_y = top + cran_h * 0.45
+    eye_dx = cran_w * 0.235
+    for sx in (-1, 1):
+        hd.ellipse([cx + sx * eye_dx - eye_r, eye_y - eye_r * 0.82,
+                    cx + sx * eye_dx + eye_r, eye_y + eye_r * 0.82], fill=255)
+    nose_y = top + cran_h * 0.74
+    nw = cran_w * 0.085
+    hd.polygon([(cx, nose_y - nw * 1.5), (cx - nw, nose_y + nw), (cx + nw, nose_y + nw)], fill=255)
+    gap = jaw_w * 0.22
+    for i in (-1, 0, 1):
+        tx = cx + i * gap
+        hd.rectangle([tx - jaw_w * 0.035, jaw_top + jaw_h * 0.05, tx + jaw_w * 0.035, jaw_top + jaw_h * 0.9], fill=255)
+
+    alpha = ImageChops.subtract(solid, holes).resize((size, size), Image.BOX)
+    out = []
+    for a in pixels(alpha):
+        if a < MIN_COVER:
+            out.append(TRANSPARENT)
+            continue
+        t = min(255, a)
+        out.append(rgb565(*[(red[c] * t + PANEL[c] * (255 - t) + 127) // 255 for c in range(3)]))
+    return out
 
 
 # ---- splash and loader ------------------------------------------------------------------------------
@@ -490,6 +542,9 @@ def build() -> tuple[dict[str, list[int]], list[int], list[int], list[int]]:
     for name, fname, row, col in ICON_SOURCES:
         if fname is None:
             icons[name] = make_mascot_tile(ICON_PX)
+            continue
+        if fname == "@skull":
+            icons[name] = make_skull_tile(ICON_PX)
             continue
         if fname not in sheets:
             sheets[fname] = Image.open(RAW / fname).convert("RGB")

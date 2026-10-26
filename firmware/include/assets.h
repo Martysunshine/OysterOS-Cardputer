@@ -12,6 +12,8 @@ enum class IconId : uint8_t {
   Security, OysterAi, Linux, ControlDeck, SmartHome, Apps, Settings,
   // feature icons
   Wifi, Ble, Findings, Targets, Assess,
+  // red-team tile (procedural red skull)
+  RedTeam,
   Count
 };
 

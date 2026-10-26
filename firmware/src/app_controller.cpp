@@ -151,7 +151,7 @@ const HomeTile kHome[] = {
     {HomeItem::ControlDeck, 4, "Control", assets::IconId::ControlDeck},
     {HomeItem::OysterAi, 2, "Oyster AI", assets::IconId::OysterAi},
     {HomeItem::SmartHome, 5, "SmartHome", assets::IconId::SmartHome},
-    {HomeItem::RedTeam, 3, "Red Team", assets::IconId::Count},
+    {HomeItem::RedTeam, 3, "Red Team", assets::IconId::RedTeam},
     {HomeItem::OriginalApps, 6, "Original", assets::IconId::Apps},
     {HomeItem::Settings, 7, "Settings", assets::IconId::Settings},
     {HomeItem::Help, 8, "Help", assets::IconId::Count},
@@ -1699,12 +1699,12 @@ void refresh_module_view(uint32_t now) {
 // exists as separate projects the owner can flash themselves; it is not part of Oyster.
 void show_redteam_info() {
   show_message("Red Team",
-               "Oyster is a recon and defensive companion.\n\nIt does not include tools that knock other "
-               "devices offline or trick people into giving up credentials: those harm bystanders who did "
-               "not consent, so they are out of scope here.\n\nThe tools that are here work on your own "
-               "networks and devices: Wi-Fi survey and live scan, Bluetooth explorer, enrolled-target "
-               "assessment, IR. Dedicated offensive firmware for this board exists as separate projects you "
-               "can flash yourself.");
+               "Oyster does recon and defence on your own networks and devices: Wi-Fi survey and live "
+               "scan, Bluetooth explorer, enrolled-target assessment, IR.\n\n"
+               "Full offensive Wi-Fi firmware for this board is a separate project you flash yourself:\n"
+               "Evil-M5Project by 7h30th3r0n3\n"
+               "github.com/7h30th3r0n3/Evil-M5Project\n\n"
+               "Its attacks (deauth, captive portals, Karma, beacon spam) are not built into Oyster.");
 }
 
 void home_action(uint8_t idx) {

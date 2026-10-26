@@ -25,7 +25,7 @@ HOME_TILES = (  # (key, label, icon, number, module), row-major as kHome in app_
     ("deck", "Control", "ControlDeck", 4, "deck"),
     ("ai", "Oyster AI", "OysterAi", 2, "ai"),
     ("smart", "SmartHome", "SmartHome", 5, "smart"),
-    ("linux", "Red Team", None, 3, "linux"),
+    ("linux", "Red Team", "RedTeam", 3, "linux"),
     ("original", "Original", "Apps", 6, "original"),
     ("settings", "Settings", "Settings", 7, "settings"),
     ("help", "Help", None, 8, "system"),
