@@ -1,276 +1,237 @@
-# OysterOS 🦪
-### A pocket computer for security, Linux, AI and automations — built for the M5Stack Cardputer ADV
+<p align="center">
+  <img src="assets/banner.png" alt="OysterOS: a pocket computer for the M5Stack Cardputer ADV" width="100%">
+</p>
 
-![OysterOS banner](assets/banner.png)
+<p align="center">
+  <b>A keyboard-first pocket operating system for the M5Stack Cardputer ADV:</b><br>
+  Wi-Fi and Bluetooth recon, an AI assistant that answers over its own Wi-Fi, smart-home and PC control,
+  on-device Python scripting, and an offline calculator — on a 240 × 135 screen.
+</p>
 
-**Project status: early implementation, nothing verified on hardware yet.** This repository is an educational computer-science project, not a firmware release.
+<p align="center">
+  <img alt="ESP32-S3" src="https://img.shields.io/badge/MCU-ESP32--S3-5EEAD4?style=flat-square&labelColor=101923">
+  <img alt="PlatformIO" src="https://img.shields.io/badge/firmware-PlatformIO%20%C2%B7%20C%2B%2B-5EEAD4?style=flat-square&labelColor=101923">
+  <img alt="FastAPI" src="https://img.shields.io/badge/companion-FastAPI%20%C2%B7%20Python-B79CFF?style=flat-square&labelColor=101923">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-2%2C500%2B-F5B85B?style=flat-square&labelColor=101923">
+  <img alt="Status" src="https://img.shields.io/badge/status-running%20on%20real%20hardware-5EEAD4?style=flat-square&labelColor=101923">
+</p>
 
-OysterOS turns the Cardputer ADV into a keyboard-first pocket control terminal: survey networks, inspect your own Bluetooth devices, ask an AI assistant, check Linux machines, and launch useful automations from a **Smart Control Deck**.
+---
 
-> **Keep the original software.** Compass, voice tools, PikaScript, GPS menu and other original applications must remain accessible. Our first engineering task is to identify the installed firmware and determine how to add OysterOS without overwriting it. Nothing should be flashed until we have tested a reversible integration strategy. GPS functionality may require external hardware.
+**OysterOS** is a complete firmware plus companion stack that turns the
+[M5Stack Cardputer ADV](https://docs.m5stack.com/en/core/Cardputer-Adv) (an ESP32-S3 with a tiny keyboard and screen) into a
+pocket terminal. It boots to its own home screen, joins your Wi-Fi by itself, and works **standalone** —
+the laptop backend is an optional power-up, not a requirement.
 
-## Status: what exists today and what is still vision
+The project covers the whole chain: C++ firmware with a custom UI toolkit, a Python companion backend,
+an AI agent loop with typed tools, a pixel-accurate screen simulator, provisioning over USB serial, and
+about 2,500 automated tests (2,081 Python, 426 firmware unit tests).
 
-The implementation was written and compiled on a PC; **no Cardputer has been attached, so nothing is verified on the device.** The rest of this page is the product vision.
+## Contents
 
-| Module of the vision | Today |
-|---|---|
-| Security Toolkit | **Wi-Fi Survey** and **BLE Explorer** are written in the firmware (Home > Security; 2.4 GHz only; BLE inspection of locally enrolled lab targets only). Findings are stored as evidence on the microSD card and in the backend, and listed under **Saved Findings**. Unverified on hardware. |
-| Oyster AI | Runs through the companion backend (FastAPI on your PC, Groq through an OpenAI-compatible API); the **Oyster AI** tile on the device asks and shows the answer. The Groq adapter is tested against mocked HTTP and a fake provider, and in the lab demo against a real Groq model with a simulated device; it has not run with the Cardputer yet. Text only. |
-| Linux Console (the **Hosts** tile) | Written in the firmware and the backend, **unverified on the device**: host list, overview (CPU, memory, disk, uptime), services and a Logs page that says plainly there is no log source. Read-only; the backend can read the PC it runs on ([Companion API](docs/COMPANION_API.md)). No remote hosts, no logs. |
-| Smart Control Deck | Written in the firmware and the backend, **unverified on the device**: profiles, slots 1-9, a local confirmation for impactful slots, result and history. The backend has a mock executor (default) and a Windows executor for the PC it runs on (media keys, lock, Wake-on-LAN, service restart); the Windows actions are unit-tested only, not tried in a real session ([Control Deck](docs/CONTROL_DECK.md)). |
-| Smart Home | Written in the firmware and the backend, **unverified on the device**: an IR remote for five TV families (Cardputer IR LED, pin assumed, no code tried on a real TV) and a Home Assistant bridge with an owner-written allowlist. Home Assistant is not configured yet, and the screen says so ([Smart Home](docs/HOME_ASSISTANT.md)). |
-| Original Apps | **Not built on the device.** Its Home tile is greyed out and opens "Not available in this build"; it never shows a fake screen. |
-| Settings & Device Tools | Backend state, storage, diagnostics, keyboard help and a key tester, plus USB serial provisioning, are written, unverified. |
+- [The screens](#the-screens)
+- [What each tile does](#what-each-tile-does)
+- [How it fits together](#how-it-fits-together)
+- [Lighting control](#lighting-control)
+- [Interesting facts](#interesting-facts)
+- [What runs on real hardware today](#what-runs-on-real-hardware-today)
+- [Getting started](#getting-started)
+- [Repository map](#repository-map)
+- [Scope and safety](#scope-and-safety)
+- [Documentation](#documentation)
 
-**The current firmware build is a full-flash image.** It carries its own partition table without OTA and replaces the factory firmware, the launcher and the original apps. That does not yet meet the principle above ("keep the original software"): a launcher-compatible build has not been made. Until then the safety net is a verified backup: `scripts\firmware-flash.ps1` refuses to flash a chip that has no matching backup made by `scripts\firmware-backup.ps1`. Details and the reconciliation with the design constraints: [`docs/INTEGRATION.md`](docs/INTEGRATION.md).
+## The screens
 
-## Implementation
+<p align="center">
+  <img src="assets/readme/screens.png" alt="Six OysterOS screens: Home, Wi-Fi survey, Bluetooth explorer, Control Deck, Smart Home rooms and the IR remote" width="88%">
+</p>
 
-The working code is called **Oyster Pocket**. It lives in `firmware/` (PlatformIO, C++), `backend/` (FastAPI), `lab/` (device simulator and BLE lab fixture), `simulator/` (240x135 screen simulator), `schemas/`, `scripts/` and `tests/`.
+<sub>Rendered by the project's own 240 × 135 simulator (hence the <code>SIMULATED</code> badge and demo data) —
+the same layout, fonts and colour tokens the firmware draws. Midnight navy, slate panels, a seafoam focus
+stripe, amber for warnings. The whole UI is painted through <b>one 240 × 16 pixel strip</b>; there is no
+full-screen framebuffer.</sub>
 
-| Read | For |
-|---|---|
-| [`docs/POCKET_CORE.md`](docs/POCKET_CORE.md) | What Oyster Pocket does, its scope and limits, quick start, execution modes, repository layout |
-| [`docs/INTEGRATION.md`](docs/INTEGRATION.md) | How this vision and the implementation fit: module and milestone map, API comparison, keyboard, constraints, open decisions |
-| [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | What works where (simulator, firmware, backend) and what does not exist |
-| [`docs/SETUP_WINDOWS.md`](docs/SETUP_WINDOWS.md) | Step-by-step setup on Windows, including the backup before the first flash |
-| [`docs/UI_SCREEN_MAP.md`](docs/UI_SCREEN_MAP.md) | The design's screen identifiers mapped to firmware screens, the navigation tree and the proposed keys |
-| [`docs/PRIVACY.md`](docs/PRIVACY.md) | What the AI provider receives, what is masked, what is never sent |
+## What each tile does
 
-**The OysterOS look.** The firmware screens follow the project's [UI/UX Design System](docs/DESIGN_SYSTEM.md): its palette, spacing and type sizes are constants in `firmware/include/ui_theme.h`, the Home screen is headed `OYSTER OS` with a tile grid, and a boot splash is drawn once at start-up. The mascot, the module icons and the splash are static art converted to RGB565 by `scripts/gen_assets.py`, and a six-frame loader animation (6 fps, flash-resident) plays only on the start screen, which waits for any key before Home opens. The **Go** button (G0) brings that logo screen back as a lock: any key returns to where you were. The mascot is the project's own artwork; the icons and the loader's motion reference are AI-generated; [`assets/PROVENANCE.md`](assets/PROVENANCE.md) records the models and prompts. Every region is painted through one 240 x 16 sprite (7,680 B of RAM), not a full-screen buffer. None of this has been seen on a real display, and the key bindings (including Home and Help) are proposals until tried with **Settings > Key tester**.
+Home is a two-column grid of nine tiles. Arrow keys move, <kbd>Enter</kbd> opens, <kbd>1</kbd>–<kbd>9</kbd>
+jump straight to a tile, <kbd>?</kbd> shows help, and the **G0** button locks the screen back to the animated
+mascot.
 
-## Product concept
+| | Tile | What it does | Needs the PC? |
+|:-:|---|---|:-:|
+| <img src="assets/readme/icons/security.png" width="32"> | **1 · Security** | Passive **Wi-Fi survey** (channels, signal, encryption) and a **Bluetooth LE explorer** (discover, inspect GATT services of your own lab devices). Findings are saved as evidence. | No |
+| <img src="assets/readme/icons/oysterai.png" width="32"> | **2 · Oyster AI** | Ask a question on the keyboard (or by voice through the backend). The answer comes **directly from the AI provider over the device's own Wi-Fi**; with the backend running, the AI can also call tools that make the Cardputer scan for it. | No |
+| <img src="assets/readme/icons/redteam.png" width="32"> | **3 · Red Team** | A sandboxed **Python interpreter** (PikaPython) on the device: run the built-in example or any `.py` from the SD card, with an `Oyster` module for logging and reading scan results. Also points to the separate offensive firmware for this board. | No |
+| <img src="assets/readme/icons/controldeck.png" width="32"> | **4 · Control** | A **Stream-Deck-style panel for your PC**: slots 1–9 run allowlisted actions (media keys, lock, Wake-on-LAN, service restart). Impactful slots need a confirmation on the device. | Yes |
+| <img src="assets/readme/icons/smarthome.png" width="32"> | **5 · Smart Home** | An **IR remote** for five TV families from the Cardputer's own IR LED, plus **lights, switches and locks through Home Assistant** — see [Lighting control](#lighting-control). | IR: no · HA: yes |
+| <img src="assets/readme/icons/apps.png" width="32"> | **6 · Original** | Explains how to go back to the factory firmware: one script restores the verified backup of your own chip, another brings OysterOS back. | — |
+| <img src="assets/readme/icons/scratchpad.png" width="32"> | **9 · Scratchpad** | An **offline calculator and notepad**. A big mint result display, amber operators, a history tape. Lives in RAM only: nothing is stored, nothing is sent. | No |
+| <img src="assets/readme/icons/settings.png" width="32"> | **7 · Settings** | Join a Wi-Fi network from the keyboard, brightness, storage, diagnostics, a key tester and the status-LED colour legend. | No |
+| | **8 · Help** | Every key, every screen, and what the LED colours mean. | No |
 
-Instead of yet another list of unconnected demonstrations, OysterOS provides one consistent shell with:
-- **Security Toolkit** — passive Wi-Fi survey, BLE discovery and authorized device diagnostics.
-- **Oyster AI** — keyboard/voice questions and explanations through a hosted AI service.
-- **Linux Console** — view health, services and logs of computers you administer, via a trusted companion.
-- **Smart Control Deck** — physical shortcuts for approved computer actions, smart-home controls and automation workflows.
-- **Smart Home** — configurable IR and Home Assistant integrations.
-- **Original Apps** — go back to the *actual* original launcher, not a mock copy.
-- **Settings & Device Tools** — profiles, network/pairing, diagnostics, battery, and keyboard help.
+## How it fits together
 
-The Cardputer handles input, display, Wi-Fi/BLE discovery and IR. A **companion service** running on a Linux/Windows PC handles protected actions, scheduling, SSH, AI API calls and integrations.
-
-## Visual identity
-
-**Midnight navy · deep slate panels · seafoam focus · white text · amber warnings.** High contrast, clean geometry, little text per page, large enough selected states for a **240 × 135 landscape** screen.
-
-### 1. Home
-```text
-╭──────────────────────────────────╮
-│ ◈ OYSTER OS            WiFi  86% │
-│──────────────────────────────────│
-│ > 1 SECURITY       4 CONTROL    │
-│   2 OYSTER AI      5 SMART HOME │
-│   3 LINUX          6 ORIGINAL   │
-│──────────────────────────────────│
-│ [↑↓] Move [Enter] Open [?] Help │
-╰──────────────────────────────────╯
-```
-
-### 2. Security Toolkit
-```text
-╭──────────────────────────────────╮
-│ SECURITY                  01/03  │
-│──────────────────────────────────│
-│ > Wi-Fi Survey                    │
-│   Bluetooth Explorer              │
-│   Saved Findings                  │
-│──────────────────────────────────│
-│ [Enter] Open        [Back] Home   │
-╰──────────────────────────────────╯
-```
-**Wi-Fi Survey** → scanning → list (SSID / RSSI) → network detail (channel, BSSID, security) → save finding → optional AI explanation.
-
-**BLE Explorer** → advertisement list → device detail (signal, services if available) → authorized GATT inspection → save result.
-
-### 3. Oyster AI
-```text
-╭──────────────────────────────────╮
-│ OYSTER AI          Connected  ●  │
-│──────────────────────────────────│
-│ Ask about a scan, service or log │
-│ > Why is this Wi-Fi so weak?      │
-│                                   │
-│ [Enter] Send    [Mic] Record*     │
-╰──────────────────────────────────╯
-```
-Keyboard compose → submit → waiting indicator → answer pages. Context attachment to scan or service result only after review. Microphone support is a later-phase feature.
-
-### 4. Linux Console
-```text
-╭──────────────────────────────────╮
-│ LINUX             HOST: MINI-PC  │
-│──────────────────────────────────│
-│ > System health        ● Online  │
-│   Services                       │
-│   Recent logs                    │
-│   Approved tasks                 │
-│──────────────────────────────────│
-│ [Enter] Inspect      [Back] Home │
-╰──────────────────────────────────╯
-```
-Host selection → approved capability → request to authenticated companion → progress → result or actionable error. **No arbitrary shell field on the Cardputer by default.**
-
-### 5. Smart Control Deck
-```text
-╭──────────────────────────────────╮
-│ CONTROL DECK       PROFILE: HOME │
-│──────────────────────────────────│
-│ > 1 Check server                  │
-│   2 Start dev stack              │
-│   3 Red Orca status              │
-│   4 Backup workflow              │
-│──────────────────────────────────│
-│ [Enter] Run      [Back] Home     │
-╰──────────────────────────────────╯
-```
-Profile → macro list → parameter prompt if required → **confirmation for impactful actions** → queued/running/success/failure → history. Physical number keys act as *context-specific* shortcuts; they do not conflict with Home selection.
-
-### 6. Smart Home
-```text
-╭──────────────────────────────────╮
-│ SMART HOME             ROOM: DESK│
-│──────────────────────────────────│
-│ > Lights             OFF         │
-│   IR remote                      │
-│   Scenes                         │
-│   Automations                    │
-│──────────────────────────────────│
-│ [Enter] Choose     [Back] Home   │
-╰──────────────────────────────────╯
-```
-Device/scene selection → capability detail → execute on approved home-integration target → result. Show unavailable states if hardware/hub isn't connected.
-
-### 7. Original Apps
-An explicit **Original Apps** entry invokes the *genuine existing launcher* if the installed firmware exposes a supported return/launch path. If coexistence is not verified, disable this entry with an explanatory screen in prototypes — **never fake a successful switch.**
-
-## Navigation contract
-
-| Interaction | Expected behavior |
-|---|---|
-| Up / Down | Move visible focus |
-| Enter | Open / select |
-| Back | Return one screen, without losing an in-progress task silently |
-| Home | Return to OysterOS root |
-| 1–6 on Home | Open the six main destinations |
-| 1–9 in Control Deck | Select/run assigned macro, subject to confirmation |
-| Help | Show current-screen controls |
-| Original Apps | Switch via verified launcher integration only |
-
-Physical key combinations must be discovered and tested against the firmware installed on **this** Cardputer ADV. Back/Home are **logical actions** in the input layer until the actual keyboard mappings and launcher API are known. Avoid trapping users in apps as happened with the original Compass program.
-
-## How the modules connect
 ```mermaid
-flowchart TD
-    A[Physical keyboard / Display] --> B[OysterOS Shell Router]
-    B --> C[Security Toolkit]
-    B --> D[Oyster AI]
-    B --> E[Linux Console]
-    B --> F[Smart Control Deck]
-    B --> G[Smart Home]
-    B --> H[Original Apps Adapter]
-    C --> I[Wi-Fi & BLE Hardware]
-    D --> J[Authenticated Companion API]
-    E --> J
-    F --> J
-    G --> J
-    G --> K[IR Hardware]
-    J --> L[Approved Linux Operations]
-    J --> M[Automation Scheduler]
-    J --> N[Home Assistant / MQTT]
-    J --> O[Hosted AI Provider]
-    H --> P[Verified Existing Launcher]
+flowchart LR
+    subgraph Pocket["Cardputer ADV · OysterOS firmware"]
+        UI["UI task<br/>240×135 · keyboard"]
+        W["Worker task<br/>Wi-Fi · BLE · IR · scripts"]
+        UI <--> W
+    end
+
+    AI[("AI provider<br/>(OpenAI-compatible API)")]
+    subgraph PC["Your PC · optional companion"]
+        B["FastAPI backend<br/>agent loop · evidence · audit"]
+    end
+    HA["Home Assistant"]
+    L["Lights · switches"]
+    TV["TV"]
+
+    W -- "TLS, standalone mode" --> AI
+    W <-- "TLS + device token" --> B
+    B -- "tool calls" --> AI
+    B -- "allowlisted actions" --> HA --> L
+    W -. "infrared" .-> TV
 ```
 
-**Data flow:** UI event → screen router → module controller → hardware driver *or* API client → typed result → loading/error/confirmation state → screen render. Each module has a real handler or is visibly marked **Not implemented**; no decorative buttons pretending to work.
+- **Standalone:** the Cardputer holds its own Wi-Fi credentials and AI key, keeps the link up, and talks
+  TLS straight to the AI provider. No laptop involved.
+- **With the companion:** the backend runs an **agent loop**. The model never touches the radio: it can only
+  request typed tools (`wifi_survey`, `ble_discover`, `ble_inspect_gatt`, ...). The backend validates each
+  request against a schema, turns it into a job, the Cardputer executes it and sends the result back,
+  and the model writes its answer from real data. Anything that changes a device's state needs a
+  **physical key press on the Cardputer**.
 
-## Engineering approach
+## Lighting control
 
-| Layer | Responsibilities |
-|---|---|
-| Input | Keyboard scanning, debouncing, key-map, Back/Home routing |
-| UI / Router | Screens, focus, modal prompts, status, navigation stack |
-| Controllers | Wi-Fi, BLE, AI, Linux, Deck, Smart Home, Original Apps |
-| Drivers | Display, radio, mic, IR, battery |
-| API client | Pairing, authenticated HTTPS requests, retries and offline errors |
-| Companion | Allowlisted task runner, SSH access, scheduler, AI gateway, home integrations |
-| Persistence | Device preferences and bounded findings cache; companion profiles/history |
+The **Smart Home** tile lists your rooms and lights from Home Assistant and turns them on and off from the
+keyboard; the toast shows the state Home Assistant reports back, never a guess. Locks, covers and alarm
+panels open a confirmation page first, and every action is written to an audit log.
 
-Firmware candidates: **PlatformIO + C++** with device-specific M5Stack libraries, or the plugin/app framework supported by the current launcher. Companion candidate: **FastAPI + SQLite + scheduler**, with tested Linux/Windows adapters. Final stack must be chosen **after firmware audit**, not assumed.
+**Hooking up Wi-Fi lights (example: Hama Smart Home)** — Hama's Wi-Fi bulbs are built on Tuya:
 
-### Repository roadmap
-- [ ] Phase 0: Firmware identification, inventory, backup/recovery assessment, coexistence proof
-- [ ] Phase 1: UI shell + 240×135 views + reliable Back/Home + Original Apps adapter
-- [ ] Phase 2: Wi-Fi/BLE tools and finding storage
-- [ ] Phase 3: Companion pairing and read-only Linux health checks
-- [ ] Phase 4: Control Deck macros, logs and confirmations
-- [ ] Phase 5: Smart Home and scheduled automations
-- [ ] Phase 6: Oyster AI, context ingestion and optional voice input
-- [ ] Phase 7: On-device testing, reliability, docs and release build
+1. Pair the lights in the **Smart Life** (Tuya) app instead of the Hama app — Home Assistant's Tuya
+   integration can read Smart Life accounts.
+2. In Home Assistant add the **Tuya** integration and log in by scanning its QR code with Smart Life.
+3. Create a long-lived access token (Profile → Security) and put the URL and token into `backend/.env`
+   (`HOME_ASSISTANT_URL`, `HOME_ASSISTANT_TOKEN`).
+4. List the lights you want on the pocket device in an allowlist, starting from
+   [`examples/home_allowlist.example.json`](examples/home_allowlist.example.json). Only what is listed can be
+   controlled.
 
-## Safety by design
-Passive network discovery by default; deeper inspection only on owned or explicitly authorized assets. Linux and automation actions use **backend allowlists**, least-privilege accounts, authentication, timeouts, confirmation of impactful actions and audit trails. AI suggestions cannot execute arbitrary commands. Never commit credentials.
+Full walkthrough and the verification checklist: [`docs/HOME_ASSISTANT.md`](docs/HOME_ASSISTANT.md).
+The Cardputer also has a **WS2812 status LED** that shows the connection state in colour (legend under
+Help).
 
-## Secrets
+## Interesting facts
 
-The AI key lives only in `backend/.env` on your PC; it is never sent to the Cardputer, written to the SD card or logged. Never commit `backend/.env`, device tokens, Wi-Fi passwords, raw surveys, SD dumps or the flash backups in `_backups/` (they can contain credentials of the original firmware). What the AI provider receives is listed in [`docs/PRIVACY.md`](docs/PRIVACY.md); how the admin API and the device API are separated is in [`docs/POCKET_CORE.md`](docs/POCKET_CORE.md#secrets).
+- **It's an agent's hands, not its brain.** An LLM can't run on an ESP32-S3 — this one has no PSRAM and
+  about 56 KB of free heap at runtime. So the Cardputer is the agent's *sensors and actuators*: the model
+  reasons in the cloud, and the pocket device does the scanning and acting through a strict tool interface.
+- **Could the model live on the SD card?** Not a language model: even the smallest useful ones need
+  hundreds of megabytes of RAM, which is thousands of times what this chip has. What *does* work is moving
+  the brain closer: the backend speaks the OpenAI-compatible API, so it can point at a model running on
+  your own PC (llama.cpp, Ollama, LM Studio, …) — then the **whole agentic pipeline runs inside your
+  home network** with the Cardputer as its field device (supported by design, not yet tested with a local
+  model). The SD card's job is scripts and evidence: drop a `.py` into `/oyster/scripts/` and the device
+  runs it.
+- **TLS on a shoestring.** mbedTLS wants 16 KB in + 16 KB out per connection, and the buffers can't be
+  shrunk in this framework. Making the standalone AI work meant freeing about 8 KB of internal RAM so the
+  hardware SHA engine could verify the provider's elliptic-curve certificate chain.
+- **One strip, whole UI.** Every screen region is drawn through a single 240 × 16 sprite (7,680 bytes)
+  instead of a 64 KB framebuffer. Nothing animates unless the screen actually changed — except the
+  mascot's 6 fps loader on the lock screen.
+- **The original firmware is never lost.** The flash script refuses to write a chip that has no verified
+  full backup of *that exact chip*. An attempt to dual-boot the factory firmware on the device was tested
+  and documented as impossible (an ESP-IDF 5 app cannot be loaded by an ESP-IDF 4 bootloader, and the chip
+  has one bootloader slot), so restoring is a one-command PC step instead.
+- **A simulator that tests the firmware's UI.** The Python simulator renders all 41 screens in five states;
+  parity tests check that its tiles, footers and key hints match the C++ firmware.
+- **Scripts can't brick the device.** The Python sandbox has no network or file access beyond its one
+  script, every sleep is capped and cancellable, and all of the interpreter's file hooks fail closed
+  instead of hanging.
 
-## Documentation
+## What runs on real hardware today
 
-The design package (the specification):
+Verified on the Cardputer ADV:
 
-| Document | Use it for |
-|---|---|
-| [Engineering Plan](docs/OysterOS_Project_Plan.md) | Full implementation wiring, UI contract (sections 3, 4, 10, 11), API sketch, acceptance tests |
-| [UI/UX Design System](docs/DESIGN_SYSTEM.md) | Tokens, spatial sizing, components, screen identifiers |
-| [Development Roadmap](docs/DEVELOPMENT_ROADMAP.md) | Milestones M0-M8 and the MVP acceptance list |
-| [Firmware Preservation Audit](docs/HARDWARE_AUDIT_TEMPLATE.md) | Checklist to complete before anything is flashed |
+- Boot, splash and lock screen, keyboard, battery indicator, status LED
+- Wi-Fi auto-connect with a separate **ONLINE / Wi-Fi** indicator, joining networks from Settings
+- **Oyster AI answering with the laptop switched off** (direct over Wi-Fi), and through the backend
+- USB serial provisioning, TLS with a per-device token to the backend
+- Wi-Fi survey and BLE discovery triggered by an AI question
 
-The implementation (Oyster Pocket):
-
-| Document | Use it for |
-|---|---|
-| [`docs/INTEGRATION.md`](docs/INTEGRATION.md) | How the design package and the implementation fit |
-| [`docs/POCKET_CORE.md`](docs/POCKET_CORE.md) | Overview, scope, quick start, execution modes |
-| [`docs/SETUP_WINDOWS.md`](docs/SETUP_WINDOWS.md) | Step-by-step setup, backup, flashing, provisioning, demo |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How the parts fit together |
-| [`docs/UI_SCREEN_MAP.md`](docs/UI_SCREEN_MAP.md) | Design screen identifiers against firmware screens, navigation tree, proposed keys |
-| [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | What works where, and what does not exist yet |
-| [`docs/HARDWARE_VERIFICATION.md`](docs/HARDWARE_VERIFICATION.md) | Checklist for the real device, with a results table |
-| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Certificates, COM ports, download mode, restoring the backup |
-| [`docs/SIMULATOR.md`](docs/SIMULATOR.md) | The 240x135 screen simulator: run it, routes and states, what is and is not verified |
-| [`docs/COMPANION_API.md`](docs/COMPANION_API.md) | Pairing and read-only host health (mock adapter and a `local` adapter for the backend PC) |
-| [`docs/CONTROL_DECK.md`](docs/CONTROL_DECK.md) | Allowlisted jobs with local confirmation (mock and Windows executors), the device flow |
-| [`docs/HOME_ASSISTANT.md`](docs/HOME_ASSISTANT.md) | Smart Home: IR remote, Home Assistant bridge, allowlist, setup and verification checklist |
-| [`docs/API.md`](docs/API.md), [`docs/PROVISIONING.md`](docs/PROVISIONING.md), [`docs/BLE_LAB_PROFILE.md`](docs/BLE_LAB_PROFILE.md) | HTTP API, USB serial provisioning, lab GATT profile |
-| [`docs/PRIVACY.md`](docs/PRIVACY.md), [`docs/BUILD_MATRIX.md`](docs/BUILD_MATRIX.md), [`docs/adr/`](docs/adr/) | Data sent to the AI provider, pinned toolchain, architecture decisions |
-
-The first implementation tasks can be tracked in the GitHub Issues of the repository.
+Written and tested on the PC, **not yet tried on the device**: Control Deck actions, the IR remote and the
+Home Assistant bridge, Python scripts (Red Team), push-to-talk voice and the Scratchpad. The honest,
+row-by-row state is in [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) and
+[`docs/HARDWARE_VERIFICATION.md`](docs/HARDWARE_VERIFICATION.md).
 
 ## Getting started
 
-Nothing here modifies the Cardputer until step 5. Commands run in PowerShell from the repository root; the full walkthrough is [`docs/SETUP_WINDOWS.md`](docs/SETUP_WINDOWS.md).
+Windows and PowerShell, from the repository root. The full walkthrough is
+[`docs/SETUP_WINDOWS.md`](docs/SETUP_WINDOWS.md).
 
-1. **By hand, before anything else:** photograph or record the current boot and home screens, firmware version and installed apps, and fill in the [Firmware Preservation Audit](docs/HARDWARE_AUDIT_TEMPLATE.md). Check which launcher framework is installed before choosing a deployment method.
-2. Install the tools and run the automated checks (no device needed):
-   ```powershell
-   .\scripts\setup.ps1
-   .\scripts\check.ps1
-   ```
-3. Run the companion backend and the simulated device (two windows):
-   ```powershell
-   .\scripts\backend.ps1
-   .\scripts\sim.ps1 -Scenario success -AutoConfirm
-   ```
-4. Build the firmware (no device needed): `.\scripts\firmware-build.ps1`
-5. **Only with the audit done:** back up the whole flash, then flash. The flash script refuses without a verified backup for that chip.
-   ```powershell
-   .\scripts\firmware-backup.ps1 -Port COM5     # manual step - unverified until run
-   .\scripts\firmware-flash.ps1 -Port COM5      # manual step - unverified until run
-   ```
-   Restoring the backup: [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md#restoring-your-own-backup-esptool).
+```powershell
+.\scripts\setup.ps1          # tools and Python environment
+.\scripts\check.ps1          # lint, ~2,500 tests, firmware build - no device needed
+.\scripts\ui-sim.ps1         # click through every screen on the PC
+```
 
-**Principle:** Make something useful, make every control work, and never sacrifice the original device software for an untested experiment.
+On the device (back up first — the flash script insists):
+
+```powershell
+.\scripts\firmware-backup.ps1 -Port COM5                          # full 8 MB backup of your chip
+.\scripts\firmware-flash.ps1  -Port COM5 -Env cardputer-adv-dualboot
+.\scripts\oyster-up.ps1                                           # provision Wi-Fi + AI key, start the backend
+```
+
+Back to the factory firmware at any time: `.\scripts\original-restore.ps1 -Port COM5`.
+
+## Repository map
+
+| Folder | What lives there |
+|---|---|
+| [`firmware/`](firmware/) | PlatformIO project: the UI, modules (one file per tile), radio and TLS clients, and `lib/oyster_core` — portable logic with host-side unit tests |
+| [`backend/`](backend/) | FastAPI companion: agent loop and tool catalogue, evidence store, Control Deck, Home Assistant bridge, voice transcription, provisioning CLI |
+| [`simulator/`](simulator/) | The 240 × 135 UI simulator (headless PNG renders or a desktop window) |
+| [`lab/`](lab/) | A simulated device and a BLE lab fixture for testing without hardware |
+| [`schemas/`](schemas/) | JSON schemas shared by firmware, backend and tests |
+| [`scripts/`](scripts/) | Setup, gate, build, backup, flash, restore, provisioning |
+| [`tests/`](tests/) | Python tests (backend, simulator, assets, contracts) |
+| [`docs/`](docs/) | Design system, architecture, decisions (`docs/adr/`), setup and verification guides |
+| [`assets/`](assets/) | Mascot, icons, loader animation and their [provenance](assets/PROVENANCE.md) |
+
+## Scope and safety
+
+OysterOS is built for learning and for testing **your own** equipment. It does passive recon, inspection
+of devices you have enrolled, and automation of systems you own. It deliberately **does not** include
+tools that disrupt or deceive other people's devices — no deauthentication, beacon spam, Karma or
+credential-harvesting portals; in radio range their effect can't be limited to your own gear.
+
+Secrets stay out of the repository: the AI key lives in `backend/.env` and, for standalone mode, in the
+device's internal NVS storage — never in source, logs or on the SD card. What the AI provider receives is listed in
+[`docs/PRIVACY.md`](docs/PRIVACY.md).
+
+## Documentation
+
+| Read | For |
+|---|---|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | How firmware, backend and simulator fit together |
+| [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) | Colour tokens, type, spacing and components of the UI |
+| [`docs/UI_SCREEN_MAP.md`](docs/UI_SCREEN_MAP.md) | Every screen, the navigation tree and the keys |
+| [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | What works where, and what doesn't exist |
+| [`docs/HOME_ASSISTANT.md`](docs/HOME_ASSISTANT.md) | Smart Home: lights, IR remote, allowlist |
+| [`docs/CONTROL_DECK.md`](docs/CONTROL_DECK.md) | PC shortcuts and their safety rules |
+| [`docs/SCRIPTS.md`](docs/SCRIPTS.md) | The on-device Python sandbox and its `Oyster` module |
+| [`docs/VOICE_INPUT.md`](docs/VOICE_INPUT.md), [`docs/WEB_ACCESS.md`](docs/WEB_ACCESS.md) | Voice questions, optional web search for the AI |
+| [`docs/DUAL_BOOT.md`](docs/DUAL_BOOT.md) | The original firmware: why on-device dual boot fails, how restore works |
+| [`docs/SETUP_WINDOWS.md`](docs/SETUP_WINDOWS.md), [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Setup, flashing, COM ports, certificates |
+| [`docs/OysterOS_Project_Plan.md`](docs/OysterOS_Project_Plan.md), [`docs/DEVELOPMENT_ROADMAP.md`](docs/DEVELOPMENT_ROADMAP.md) | The original product vision and milestones |
+| [`docs/adr/`](docs/adr/) | Architecture decision records |
+
+## Credits
+
+Firmware, backend, simulator and design by **martin.matysek**. The mascot is the project's own artwork;
+how the icons, banner and loader were made is recorded in [`assets/PROVENANCE.md`](assets/PROVENANCE.md).
+Third-party code and licences (including the vendored PikaPython interpreter, MIT) are listed in
+[`LICENSE-NOTICES.md`](LICENSE-NOTICES.md).
