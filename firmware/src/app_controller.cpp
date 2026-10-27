@@ -21,6 +21,7 @@
 #include "assessment_runner.h"
 #include "assets.h"
 #include "backend_client.h"
+#include "net_link.h"
 #include "board_support.h"
 #include "device_config.h"
 #include "evidence_store.h"
@@ -408,7 +409,9 @@ ModeBanner current_mode() {
   if (s_runtime && g_backend.state() == BackendState::Connected) {
     return latest_run_used_provider() ? ModeBanner::AiConnected : ModeBanner::BackendOk;
   }
-  return ModeBanner::Offline;
+  // Wi-Fi up but no backend (e.g. standalone/direct AI) is still ONLINE, not OFFLINE - the Wi-Fi dot and
+  // this banner report the link, not the laptop.
+  return (s_runtime && net::up()) ? ModeBanner::Online : ModeBanner::Offline;
 }
 
 const char* backend_short() {
@@ -425,6 +428,13 @@ const char* backend_short() {
     case BackendState::Connected: return "online";
   }
   return "?";
+}
+
+// Wi-Fi link icon of the status bar, independent of the backend: green when the STA is associated.
+ui::Conn wifi_conn() {
+  if (net::up()) return ui::Conn::Online;
+  if (net::configured()) return ui::Conn::Connecting;
+  return ui::Conn::Offline;
 }
 
 // Connection icon of the status bar; same sources as backend_short().
@@ -1695,19 +1705,6 @@ void refresh_module_view(uint32_t now) {
   }
 }
 
-// Home tile 3. Oyster is a recon and defensive companion; it does not include tools that disrupt or
-// deceive devices and people the owner does not own. Offensive security-research firmware for this board
-// exists as separate projects the owner can flash themselves; it is not part of Oyster.
-void show_redteam_info() {
-  show_message("Red Team",
-               "Oyster does recon and defence on your own networks and devices: Wi-Fi survey and live "
-               "scan, Bluetooth explorer, enrolled-target assessment, IR.\n\n"
-               "Full offensive Wi-Fi firmware for this board is a separate project you flash yourself:\n"
-               "Evil-M5Project by 7h30th3r0n3\n"
-               "github.com/7h30th3r0n3/Evil-M5Project\n\n"
-               "Its attacks (deauth, captive portals, Karma, beacon spam) are not built into Oyster.");
-}
-
 void home_action(uint8_t idx) {
   if (idx >= kHomeCount) return;
   switch (kHome[idx].item) {
@@ -1715,7 +1712,7 @@ void home_action(uint8_t idx) {
     case HomeItem::OysterAi: nav_go(Screen::AskOyster); break;
     case HomeItem::Settings: nav_go(Screen::Settings); break;
     case HomeItem::Help: open_help(); break;
-    case HomeItem::RedTeam: show_redteam_info(); break;
+    case HomeItem::RedTeam: open_module(modules::Id::Scripts); break;
     case HomeItem::ControlDeck: open_module(modules::Id::Deck); break;
     case HomeItem::SmartHome: open_module(modules::Id::SmartHome); break;
     case HomeItem::OriginalApps: open_module(modules::Id::Original); break;
@@ -2582,7 +2579,7 @@ void render_home(const ListNav& nv) {
       case HomeItem::OysterAi: what = backend_short(); break;
       case HomeItem::Settings: what = "device"; break;
       case HomeItem::Help: what = "keys"; break;
-      case HomeItem::RedTeam: what = "info"; break;
+      case HomeItem::RedTeam: mod = modules::Id::Scripts; has_mod = true; break;
       case HomeItem::ControlDeck: mod = modules::Id::Deck; has_mod = true; break;
       case HomeItem::SmartHome: mod = modules::Id::SmartHome; has_mod = true; break;
       case HomeItem::OriginalApps: mod = modules::Id::Original; has_mod = true; break;
@@ -3006,7 +3003,7 @@ void draw(uint32_t now) {
   if (s_cur == Screen::Module) refresh_module_view(now);
   if (s_dirty_status || now - s_last_status_ms >= kStatusRefreshMs) {
     ui::draw_status(current_mode(), strip_prefix(s_session, "sess-"), backend_short(), g_board.battery_percent(),
-                    backend_conn());
+                    backend_conn(), wifi_conn());
     s_last_status_ms = now;
     s_dirty_status = false;
   }

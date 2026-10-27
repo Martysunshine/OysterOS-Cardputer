@@ -1,8 +1,8 @@
 # Hardware verification checklist
 
-Every item here is a **manual step - unverified until run**. No Cardputer has been attached to this
-project yet, so every result starts as **UNVERIFIED**. Only a result you observed on the real
-device may be changed to PASS. A compiler, the simulator or a prerecorded fixture does not count.
+Every item here is a **manual step - unverified until run**. Every result starts as **UNVERIFIED**;
+since 2026-10-25 a Cardputer ADV is attached and the rows marked PASS or PARTIAL below were observed on
+it by the owner. Only a result you observed on the real device may be changed to PASS. A compiler, the simulator or a prerecorded fixture does not count.
 
 Result values: `PASS`, `FAIL`, `PARTIAL` (works with a stated limitation), `BLOCKED` (a prerequisite is
 missing; name it), `UNVERIFIED` (not run yet).
@@ -51,7 +51,7 @@ Useful tools:
 | HV-07 | SD card missing -> volatile mode shown | UNVERIFIED | | | |
 | HV-08 | SD card full / write error -> visible state, no silent loss | UNVERIFIED | | | |
 | HV-09 | Serial provisioning, secrets never echoed | UNVERIFIED | | | |
-| HV-10 | TLS connect to backend (valid trust) | UNVERIFIED | | | |
+| HV-10 | TLS connect to backend (valid trust) | PASS | 2026-10-27 | n/a | Banner `BACKEND OK`; first attempts failed with TLS -32512/-17040/-9984 from heap exhaustion, fixed by freeing internal RAM (smaller scan buffers, reply buffer allocated after the handshake) |
 | HV-11 | TLS negative: wrong CA / wrong IP / revoked token | UNVERIFIED | | | |
 | HV-12 | Clock: serial seed, SNTP, `clock_quality` | UNVERIFIED | | | |
 | HV-13 | Wi-Fi survey (2.4 GHz), room label, export | UNVERIFIED | | | |
@@ -71,13 +71,16 @@ Useful tools:
 | HV-27 | Backup before the first flash: `firmware-backup.ps1` dumps 8 MB with verification; restoring it brings the original firmware back | PASS (dump); restore not tried | 2026-10-25 | n/a | 8,388,608 bytes, `esptool verify_flash` digest matched, valid bootloader and partition table (factory app at 0x10000). A first read at 460800 baud stalled at 19 % and was stopped (nothing written); the default is now 115200. Restore: see HV-23 |
 | HV-28 | Flash gate: `firmware-flash.ps1` refuses without a verified backup of that chip, passes with one | PARTIAL | 2026-10-25 | 0cc446875ad8 | Passed with the verified backup and the upload hash-verified. The refusal path was not tried on the device |
 | HV-29 | Boot splash drawn once at start-up, then the Home screen (heading `OYSTER OS`, tile grid, greyed-out tiles) | PARTIAL (owner-observed) | 2026-10-25 | 0cc446875ad8 | Boot, splash, Home and the four greyed-out tiles were seen on the real display and looked right; no photographs, no flicker/colour measurements. Oyster AI showed unavailable while the device was not yet provisioned |
-| HV-30 | Start screen waits for any key; the G0 button shows the same logo screen as a lock, any key returns to the same screen | UNVERIFIED | | | |
+| HV-30 | Start screen waits for any key; the G0 button shows the same logo screen as a lock, any key returns to the same screen | PASS | 2026-10-26 | n/a | Seen by the owner, including the battery icon on the start screen |
 | HV-31 | Hosts (Home 3): host list, overview (CPU, memory, disk, uptime, state, age), services, Logs page, tile text `N hosts` / `no hosts` / `offline`, failure texts | UNVERIFIED | | | |
 | HV-32 | Control Deck (Home 4) on the device: profiles and slots, run a slot, impactful confirmation (approve and reject), 700 ms key guard, emergency cancel, lost-answer text, history | UNVERIFIED | | | |
 | HV-33 | Control Deck on the real PC (`OYSTER_DECK_EXECUTOR=windows`): media keys, lock, Wake-on-LAN, service restart | UNVERIFIED | | | |
 | HV-34 | Smart Home IR (Home 5 > IR Remote): IR LED on GPIO44, each TV family against the owner's TV, one frame per key | UNVERIFIED | | | |
 | HV-35 | Smart Home with Home Assistant: unconfigured text first, then a real instance (rooms, devices, an action, impactful confirmation, failure paths) | UNVERIFIED | | | |
-| HV-36 | Status LED: green breathing online, amber blink offline, blue while a confirmation or unread answer waits, teal during a scan, announcements on finish/fail/notice; Help > Enter shows the legend with matching colours | UNVERIFIED | | | |
+| HV-36 | Status LED: green breathing online, amber blink offline, blue while a confirmation or unread answer waits, teal during a scan, announcements on finish/fail/notice; Help > Enter shows the legend with matching colours | PARTIAL | 2026-10-26 | n/a | Online/offline colours and the legend seen; announcements not yet checked |
+| HV-37 | Direct AI: Oyster AI answers with the backend stopped, over the device's own Wi-Fi | PASS | 2026-10-27 | n/a | Owner asked a question with the backend off and got an answer. Groq serves leaf -> WE1 -> GlobalSign ECC Root CA - R4; `groq_ca.h` bundles that EC chain. The EC handshake needed ~8 KiB more internal RAM (hardware SHA buffer), freed by trimming scan buffers |
+| HV-37a | Status bar: Wi-Fi dot and `ONLINE` banner independent of the backend | PASS | 2026-10-27 | n/a | Wi-Fi joins on boot without the backend; the green Wi-Fi dot and `ONLINE` show while the backend dot stays offline |
+| HV-38 | Scripts (Red Team tile 3): About page, built-in example with no SD card, SD scripts, cancel, errors | UNVERIFIED | | | About page and built-in example opened on the device; steps below not yet run |
 
 ## How to run each check
 
@@ -511,7 +514,7 @@ on-device confirmation for the virtual-LED write (including a timeout and a reje
 
 Oyster AI tile 2 answering a question with no laptop and no backend, by calling Groq directly over the
 device's own Wi-Fi (`firmware/src/direct_ai.cpp`, CA bundle `firmware/include/groq_ca.h`). The wire format
-has 16 host tests; the live request is **unverified** until this is seen on the device. A key must be stored
+has 16 host tests; the live request was **seen working on 2026-10-27** (Results: HV-37). A key must be stored
 first (`SET-AI-KEY`, loaded from `backend/.env` by `oyster-up`, or `provision-device --ai-key-file`).
 
 1. With the backend running, tile 2 reads `Oyster AI`. Stop the backend (`.\scripts\oyster-up.ps1 -Stop`) and
@@ -527,6 +530,46 @@ first (`SET-AI-KEY`, loaded from `backend/.env` by `oyster-up`, or `provision-de
 6. Voice (tile 2, `Ask a question (voice)`) still reports the backend is needed while offline: direct mode is
    text Q&A only.
 
-**Pass:** steps 1 to 6 behave as written and no key or token is ever shown. The bundled CA is unverified
-against the live host; if step 2 fails with a certificate error, the correct root must be swapped into
-`groq_ca.h` or stored in LittleFS, and this check stays UNVERIFIED until an answer is seen.
+**Pass:** steps 1 to 6 behave as written and no key or token is ever shown. Step 2 passed on 2026-10-27
+with the bundled EC chain (WE1 -> GlobalSign ECC Root CA - R4). If Groq changes its chain and step 2
+fails with a certificate error, swap the new root into `groq_ca.h` or store it in LittleFS. A
+"check the CA bundle" message can also mean the TLS handshake ran out of internal RAM (the hardware SHA
+engine logs `Failed to allocate buf memory`); check free heap before blaming the certificate.
+
+### HV-38 Scripts (Red Team tile, PikaPython)
+
+Home tile 3 ("Red Team") running a `.py` file from `/oyster/scripts` on the SD card through the vendored
+PikaPython interpreter. Details and the bound `Oyster` module: [`SCRIPTS.md`](SCRIPTS.md). **Unverified**
+until run on a real device.
+
+1. With no SD card: tile 3 lists `About / Evil-M5 reference` and `Run example (built-in)`. The first opens
+   the reference text; the second runs the compiled-in example and shows its log, with no SD card.
+2. Put a short script on the card, e.g. `/oyster/scripts/hello.py`:
+   ```python
+   import Oyster
+   o = Oyster.Oyster()
+   o.log("hello from SD\n")
+   for i in range(3):
+       o.log(str(i) + "\n")
+       o.sleep_ms(200)
+   print("done", o.wifi_ap_count())
+   ```
+   Tile 3 lists `hello.py`. Enter runs it; the Result page shows each logged line and the `print()` line in
+   order, then `(no output)` never appears when at least one line was written.
+3. Start a script with a long `sleep_ms()` or a `while True:` loop, then press the emergency cancel key
+   (Fn+\`) or Back: the script stops within about the sleep chunk size (tens of ms) or the next loop
+   iteration, the device does not hang, and a second script can be run right after.
+4. A script with a Python error (e.g. `1/0`) shows the interpreter's own error text in the result log
+   instead of crashing or rebooting the device. A script with a missing `import` of anything not bound
+   (`import os`) fails the same way, not silently.
+5. A script file at or over the size cap (`kSourceCap`, `firmware/src/modules/scripts.cpp`) is refused with
+   a clear "too large" message and never partially runs.
+6. `wifi_ap_count()` reports 0 before any Wi-Fi survey has completed this boot, and the real count after
+   one has (Security > Wi-Fi Survey), without the script itself ever starting a scan.
+7. RAM/flash headroom after adding this module (`pio run -e cardputer-adv-dualboot`; compare against the
+   figure recorded the same day in this file's earlier checks) stays within the project's usual budget.
+
+**Pass:** steps 1 to 7 behave as written, and nothing it does ever requires the backend or the laptop.
+A crash is possible in principle (the vendored interpreter's internal consistency checks call `abort()`
+on a genuine invariant violation, same as any other firmware crash path) but has not been seen; if one
+occurs, it is a device reset, not a hang, and the next boot behaves normally.

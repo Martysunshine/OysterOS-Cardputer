@@ -314,7 +314,8 @@ void begin() {
 
 bool ready() { return s_ready; }
 
-void draw_status(ModeBanner mode, const char* session_short, const char* backend, int battery_pct, Conn conn) {
+void draw_status(ModeBanner mode, const char* session_short, const char* backend, int battery_pct, Conn conn,
+                 Conn wifi) {
   if (!s_ready) return;
   const char* label = "OFFLINE";
   uint16_t fg = kTextMuted, bg = kSurfacePanel;
@@ -322,6 +323,7 @@ void draw_status(ModeBanner mode, const char* session_short, const char* backend
     case ModeBanner::LiveRadio: label = "LIVE RADIO"; fg = kSurfaceBase; bg = kAccent; break;
     case ModeBanner::AiConnected: label = "AI CONNECTED"; fg = kAccent; bg = kSurfaceFocus; break;
     case ModeBanner::BackendOk: label = "BACKEND OK"; fg = kTextPrimary; bg = kSurfaceFocus; break;
+    case ModeBanner::Online: label = "ONLINE"; fg = kSurfaceBase; bg = kAccent; break;
     case ModeBanner::StartFailed: label = "START FAILED"; fg = kSurfaceBase; bg = kError; break;
     case ModeBanner::Simulated: label = "SIMULATED"; fg = kSurfaceBase; bg = kWarning; break;
     case ModeBanner::Offline:
@@ -359,6 +361,24 @@ void draw_status(ModeBanner mode, const char* session_short, const char* backend
       default: s_band.drawCircle(cx, 7, 2, kTextMuted); break;
     }
     left_end = cx - 6;
+  }
+
+  if (wifi != Conn::Unknown) {
+    // Wi-Fi link indicator, independent of the backend: "wifi" + a dot (green = STA associated), drawn to
+    // the left of the backend indicator so the two states read separately.
+    const char* wl = "wifi";
+    const int wtx = left_end - static_cast<int>(std::strlen(wl)) * kMetaW;
+    text(wl, wtx, 4, kTextPrimary, true);
+    const int wcx = wtx - 5;
+    switch (wifi) {
+      case Conn::Online: s_band.fillCircle(wcx, 7, 2, kAccent); break;
+      case Conn::Connecting: s_band.fillCircle(wcx, 7, 2, kWarning); break;
+      case Conn::Error: s_band.fillCircle(wcx, 7, 2, kError); break;
+      case Conn::Offline:
+      case Conn::Unknown:
+      default: s_band.drawCircle(wcx, 7, 2, kTextMuted); break;
+    }
+    left_end = wcx - 6;
   }
 
   const int sess_x = kPadX + banner_w + 4;

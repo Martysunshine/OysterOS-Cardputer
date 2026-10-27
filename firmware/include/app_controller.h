@@ -23,7 +23,7 @@ enum class Screen : uint8_t {
   Unavailable, Help, LedLegend, KeyTest,  // keep KeyTest last (kScreenCount in app_controller.cpp)
 };
 
-enum class ModeBanner : uint8_t { Offline, LiveRadio, AiConnected, Simulated, BackendOk, StartFailed };
+enum class ModeBanner : uint8_t { Offline, LiveRadio, AiConnected, Simulated, BackendOk, StartFailed, Online };
 
 // Modules that did not start at boot (bit set = failed). main.cpp reports them before begin(); the UI keeps
 // a banner, lists them in Settings > Diagnostics and refuses the actions that depend on them.

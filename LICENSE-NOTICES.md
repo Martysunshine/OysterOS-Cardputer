@@ -18,6 +18,7 @@ Third-party components used (each under its own license; see the respective proj
 | truststore | MIT | backend (OS trust store) |
 | Unity test framework (ThrowTheSwitch) | MIT | firmware host tests |
 | IRremote | MIT | firmware |
+| PikaPython / PikaScript (Lyon and contributors) | MIT; the notice is kept in each vendored source file | firmware (`firmware/lib/pikascript`, the Red Team script interpreter) |
 | Bless, Bleak | MIT | lab fixture |
 | esptool (Espressif, bundled with PlatformIO as tool-esptoolpy) | GPL-2.0-or-later | run by `scripts/firmware-backup.ps1`; not distributed here |
 | psutil (Giampaolo Rodola) | BSD-3-Clause | backend (local host health adapter, Windows executor) |

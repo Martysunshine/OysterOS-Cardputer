@@ -34,7 +34,7 @@ constexpr uint32_t kDefaultTimeoutMs = 20000;
 // Called from the worker task only (one network owner), so static scratch is safe and keeps the 16 KiB
 // worker stack clear of large buffers.
 char s_body[kBodyCap];
-char s_resp[kRespCap + 1];
+char* s_resp = nullptr;  // allocated after the TLS handshake (in ask) so its ~6 KiB is free during the cert verify
 
 void secure_zero(void* p, size_t n) {
   volatile uint8_t* v = static_cast<volatile uint8_t*>(p);
@@ -286,6 +286,16 @@ Status ask(const Config& cfg, const char* question, char* answer_out, size_t ans
       break;
     }
 
+    // Handshake and certificate verification are done; only now claim the response buffer. Leaving it
+    // unallocated until here keeps ~6 KiB free during the RSA-4096 cert verify, which otherwise OOMs on
+    // this RAM-tight build (reported as TLS -17040 / -9984).
+    s_resp = static_cast<char*>(malloc(kRespCap + 1));
+    if (s_resp == nullptr) {
+      set_err(err_out, err_cap, "out of memory for the reply buffer");
+      result = Status::BadResponse;
+      break;
+    }
+
     // Request head carries the bearer token; build it, send it, then wipe it immediately.
     char host_hdr[128];
     if (cfg.port == 443) {
@@ -357,6 +367,8 @@ Status ask(const Config& cfg, const char* question, char* answer_out, size_t ans
 
   cli->stop();
   delete cli;
+  free(s_resp);  // released regardless of path; nullptr (connect failed before alloc) is a safe free
+  s_resp = nullptr;
   secure_zero(s_body, sizeof(s_body));  // held the question, not the key, but clear it anyway
   return result;
 }

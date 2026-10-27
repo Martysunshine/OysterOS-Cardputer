@@ -30,7 +30,7 @@ enum class Conn : uint8_t { Unknown, Offline, Connecting, Online, Error };
 
 // Status bar: mode banner + session short id + connection dot + backend state + battery.
 void draw_status(ModeBanner mode, const char* session_short, const char* backend, int battery_pct,
-                 Conn conn = Conn::Unknown);
+                 Conn conn = Conn::Unknown, Conn wifi = Conn::Unknown);
 
 // Paginated list (MenuList / FocusRow): heading `title` with "sel/count", then kRows rows from `top`.
 // The selected row has the accent stripe, the '>' marker and the focus background.

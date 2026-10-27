@@ -9,9 +9,9 @@
 namespace oyster::cfg {
 
 // In-memory views
-constexpr size_t kMaxApObservations = 32;
-constexpr size_t kMaxBleAdverts = 64;
-constexpr size_t kMaxGattEntriesPerPage = 64;
+constexpr size_t kMaxApObservations = 16;  // was 32; trimmed to free internal RAM for the TLS/SHA handshake
+constexpr size_t kMaxBleAdverts = 12;  // was 64; trimmed hard to free internal RAM for Groq's EC TLS/SHA handshake
+constexpr size_t kMaxGattEntriesPerPage = 24;  // was 64; trimmed to free internal RAM for the TLS/SHA handshake
 constexpr size_t kMaxBleConnections = 1;
 constexpr size_t kMaxEnrolledTargets = 8;
 

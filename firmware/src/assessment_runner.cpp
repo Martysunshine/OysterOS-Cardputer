@@ -534,6 +534,11 @@ void ask_direct(const char* question) {
   dc.ca_pem = directai::default_ca_pem();
   dc.timeout_ms = 0;  // built-in default
 
+  // Raise the link if a maintainer tick has not already done so (e.g. the very first question after boot).
+  // Blocks up to 8 s on this worker task; directai::ask still checks WL_CONNECTED and fails cleanly if the
+  // join did not finish in time.
+  net::ensure_up(8000);
+
   static char answer[1200];
   static char err[200];
   answer[0] = '\0';
@@ -1055,6 +1060,19 @@ void handle_request(WorkRequest& r) {
 
 // ---- background work ----------------------------------------------------------------------------------
 
+// Keep the STA associated whenever Wi-Fi is configured, even with no backend provisioned, so that
+// Oyster AI (direct) and anything else has a link. Without this, WiFi.begin() is only ever reached through
+// the backend connect path, so a standalone (direct-AI) device never brings the radio up at all. Runs on
+// the oyster-worker task like every other network operation, so the single-network-owner invariant and
+// ensure_up()'s worker-task-only contract hold. Non-blocking: ensure_up(0) kicks/holds the attempt and
+// respects its own backoff; setAutoReconnect(true) (set in net_link) handles drops once the link is up.
+void wifi_maintain() {
+  if (!g_radio.uplink_allowed()) return;  // don't fight a Wi-Fi survey / BLE for the shared radio
+  if (net::up()) return;                   // already associated and holding an IP
+  if (!net::configured()) return;          // no SSID saved: nothing to bring up
+  net::ensure_up(0);                       // non-blocking; backoff + auto-reconnect do the rest
+}
+
 void network_cycle() {
   if (!s_cfg.provisioned || !g_radio.uplink_allowed()) return;
   const uint32_t now = millis();
@@ -1099,6 +1117,7 @@ void worker(void*) {
   for (;;) {
     if (xQueueReceive(s_queue, &s_req, pdMS_TO_TICKS(kLoopWaitMs)) == pdTRUE) handle_request(s_req);
     if (s_reload_targets.exchange(false)) load_targets();
+    wifi_maintain();  // hold the STA up regardless of backend, so direct AI is callable standalone
     try_start_job();
     network_cycle();
     refresh_run(false);

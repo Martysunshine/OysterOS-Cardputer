@@ -204,7 +204,10 @@ bool DeviceConfigStore::ai_key_set() const {
   ensure_mutex();
   Lock l;
   if (!s_nvs_ok || !s_prefs.isKey(kKeyAiKey)) return false;
-  char probe[8];  // a real key is far longer; a non-empty value copies at least one char into probe
+  // getString returns 0 (fails) when the stored value is larger than the buffer rather than truncating,
+  // so the probe must be at least as large as the longest key we accept (provisioning caps it at 200).
+  // An 8-byte probe here made this wrongly return false for every real key, blocking direct AI entirely.
+  char probe[256];
   return s_prefs.getString(kKeyAiKey, probe, sizeof(probe)) > 0;
 }
 
