@@ -18,6 +18,8 @@ TRANSPARENT = 0xF81F
 FLASH_BUDGET_BYTES = 260_000  # all art together: icons + logo + splash + loader frames
 PNG_MAX_BYTES = 900_000
 PNG_KEEP = {b"IHDR", b"PLTE", b"tRNS", b"IDAT", b"IEND", b"sRGB", b"gAMA", b"pHYs", b"cHRM"}
+# Animated PNG frame control and frame data (no metadata), allowed only for the README walkthrough images.
+APNG_FRAMES = {b"acTL", b"fcTL", b"fdAT"}
 ARRAY_RE = re.compile(r"static const uint16_t (\w+)\[(\d+)\] = \{(.*?)\};", re.S)
 ANIM_RE = re.compile(r"static const Animation kLoader = \{" + ", ".join([r"(\d+)"] * 6) + r", kLoaderPx\};")
 SPLASH_W, SPLASH_H = 240, 135
@@ -164,7 +166,8 @@ def test_committed_pngs_have_no_ancillary_chunks_and_are_small():
     assert len(pngs) >= 10
     for p in pngs:
         assert p.stat().st_size < PNG_MAX_BYTES, f"{p.name}: {p.stat().st_size} B"
-        extra = set(_png_chunks(p)) - PNG_KEEP
+        keep = PNG_KEEP | APNG_FRAMES if p.parent.name == "readme" else PNG_KEEP
+        extra = set(_png_chunks(p)) - keep
         assert not extra, f"{p.relative_to(ROOT)}: ancillary chunks {sorted(extra)} (text, C2PA, ICC ...)"
 
 

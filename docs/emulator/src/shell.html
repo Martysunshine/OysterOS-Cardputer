@@ -1,0 +1,238 @@
+<title>OysterOS Pocket</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one deep-sea scene, the Cardputer ADV as the hero object, controls legend underneath. Single dark look on purpose (the device's own theme). */
+:root {
+  color-scheme: dark;
+  --sea: #0b1119;          /* page ground, a shade under the UI's surface.base */
+  --sea-glow: #2a1650;     /* mascot purple, used only as light */
+  --base: #101923;         /* surface.base of the firmware */
+  --panel: #192c3d;        /* surface.panel */
+  --accent: #5eead4;       /* seafoam accent */
+  --text: #f4faff;
+  --muted: #a9c4ce;
+  --warn: #e9ad52;
+  --shell: #8a9096;        /* Cardputer ADV grey plastic */
+  --shell-hi: #a5abb1;
+  --shell-lo: #5f656b;
+  --key: #23272c;
+  --key-hi: #343a41;
+  --key-text: #eef2f5;
+  --key-sub: #f2a65a;      /* secondary legends printed on the keys */
+  --font-display: "Unbounded", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+html, body { height: 100%; }
+body {
+  background:
+    radial-gradient(60% 45% at 50% 18%, color-mix(in srgb, var(--sea-glow) 75%, transparent), transparent 70%),
+    radial-gradient(40% 30% at 85% 90%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%),
+    var(--sea);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.wrap {
+  max-width: 980px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 40px;
+  display: grid; gap: 22px; justify-items: center;
+}
+header { text-align: center; display: grid; gap: 6px; }
+h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(1.6rem, 4.4vw, 2.5rem); letter-spacing: -0.01em; text-wrap: balance;
+}
+h1 .os { color: var(--accent); }
+.lede { margin: 0; color: var(--muted); max-width: 60ch; text-wrap: balance; }
+
+/* ---------- the device ---------- */
+.device {
+  --w: min(100%, 760px);
+  width: var(--w); aspect-ratio: 84 / 54; max-width: 100%;
+  position: relative; border-radius: 4.2% / 6.5%;
+  background:
+    linear-gradient(180deg, var(--shell-hi), var(--shell) 18%, var(--shell) 70%, var(--shell-lo));
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.35) inset,
+    0 -2px 0 rgba(0,0,0,.25) inset,
+    0 30px 60px -20px rgba(0,0,0,.75),
+    0 0 0 1px rgba(0,0,0,.35);
+  container-type: inline-size;
+}
+.device::after { /* faint moulding line between the screen deck and the keyboard deck */
+  content: ""; position: absolute; left: 3%; right: 3%; top: 47.5%; height: 1px;
+  background: rgba(0,0,0,.18); box-shadow: 0 1px 0 rgba(255,255,255,.18);
+}
+.g0 {
+  position: absolute; top: -1.6%; right: 9%; width: 9%; height: 3.2%;
+  border-radius: 6px 6px 2px 2px; border: 0; cursor: pointer;
+  background: linear-gradient(180deg, #d9dde0, #9aa1a7);
+  box-shadow: 0 -1px 0 rgba(255,255,255,.6) inset, 0 2px 3px rgba(0,0,0,.35);
+}
+.g0:active, .g0.down { transform: translateY(1.5px); box-shadow: 0 0 0 2px var(--accent), 0 0 14px var(--accent); }
+.g0-label {
+  position: absolute; top: 2.6%; right: 9%; width: 9%; text-align: center;
+  font: 700 1.25cqi/1 var(--font-mono); color: #3b4045; letter-spacing: .06em;
+}
+.power {
+  position: absolute; left: -1.1%; top: 18%; width: 1.6%; height: 9%;
+  border-radius: 3px 0 0 3px; background: linear-gradient(90deg, #6f757b, #9da3a9);
+}
+.silk {
+  position: absolute; left: 4.5%; top: 5.5%; font: 700 1.55cqi/1 var(--font-mono);
+  color: #43494f; letter-spacing: .14em; text-transform: uppercase;
+}
+.silk.r { left: auto; right: 4.2%; top: 9.5%; font-size: 1.3cqi; letter-spacing: .1em; }
+.led {
+  position: absolute; left: 6.2%; top: 11%; width: 1.5%; aspect-ratio: 1; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 0 1.4cqi var(--accent), 0 0 3cqi color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: breathe 3.2s ease-in-out infinite;
+}
+.led.amber { --led: #ff8a1f; background: var(--led); box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 0 1.4cqi var(--led), 0 0 3cqi color-mix(in srgb, var(--led) 60%, transparent); animation: blink2 2s steps(1, end) infinite; }
+.led.white { --led: #f4faff; background: var(--led); box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 0 1.4cqi var(--led), 0 0 3cqi color-mix(in srgb, var(--led) 60%, transparent); animation: breathe 3.2s ease-in-out infinite; }
+@keyframes blink2 { 0% { opacity: 1; } 12% { opacity: .12; } }
+.led.warn { background: var(--warn); box-shadow: 0 0 0 1px rgba(0,0,0,.35), 0 0 1.4cqi var(--warn), 0 0 3cqi color-mix(in srgb, var(--warn) 60%, transparent); }
+@keyframes breathe { 50% { opacity: .55; } }
+.speaker {
+  position: absolute; right: 4.2%; top: 18%; width: 9%; height: 16%;
+  background-image: radial-gradient(circle, rgba(0,0,0,.45) 32%, transparent 36%);
+  background-size: 1.5cqi 1.5cqi; opacity: .8;
+}
+.bezel {
+  position: absolute; left: 23.5%; top: 6%; width: 53%; height: 38.5%;
+  background: #07090c; border-radius: 1.6cqi;
+  box-shadow: 0 0 0 .35cqi #2e3338, 0 1px 0 .5cqi rgba(255,255,255,.12);
+  display: grid; place-items: center;
+}
+.screen {
+  position: relative; height: 90%; aspect-ratio: 240 / 135; max-width: 96%; background: var(--base);
+  overflow: hidden; border-radius: .4cqi;
+}
+.screen canvas {
+  width: 100%; height: 100%; display: block;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+.screen::after { /* glass */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, rgba(255,255,255,.10), rgba(255,255,255,0) 38%);
+}
+.loading[hidden] { display: none; }
+.loading {
+  position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted);
+  font: 500 1.6cqi/1.2 var(--font-mono);
+}
+.kbd {
+  position: absolute; left: 3.6%; right: 3.6%; top: 51%; bottom: 5%;
+  display: grid; grid-template-rows: repeat(4, 1fr); gap: 2.2%;
+}
+.row { display: grid; grid-template-columns: repeat(14, 1fr); gap: .75%; }
+.key {
+  position: relative; border: 0; padding: 0; cursor: pointer;
+  border-radius: .9cqi; background: linear-gradient(180deg, var(--key-hi), var(--key));
+  box-shadow: 0 .35cqi 0 #121417, 0 .5cqi .6cqi rgba(0,0,0,.35), 0 1px 0 rgba(255,255,255,.08) inset;
+  color: var(--key-text); font-family: var(--font-mono); font-weight: 700;
+  display: grid; place-items: center; transition: transform .06s, box-shadow .06s;
+  -webkit-tap-highlight-color: transparent;
+}
+.key .m { font-size: 1.85cqi; line-height: 1; }
+.key .s {
+  position: absolute; top: 9%; left: 0; right: 0; text-align: center;
+  font-size: 1.15cqi; color: var(--key-sub); line-height: 1;
+}
+.key.has-s .m { transform: translateY(22%); }
+.key.word .m { font-size: 1.3cqi; letter-spacing: .02em; }
+.key.live { color: var(--accent); }
+.key.live .s { color: var(--accent); }
+.key:active, .key.down {
+  transform: translateY(.3cqi);
+  box-shadow: 0 .05cqi 0 #121417, 0 0 0 .3cqi var(--accent), 0 0 2cqi color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.key.latched { background: linear-gradient(180deg, #2f5c5c, #1e3f40); color: var(--accent); }
+.key:focus-visible, .g0:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- below the device ---------- */
+.bar {
+  width: min(100%, 760px); display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 10px 16px;
+}
+.where { font: 500 .85rem/1.3 var(--font-mono); color: var(--muted); }
+.where b { color: var(--accent); font-weight: 700; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  font: 600 .9rem/1 var(--font-body); color: var(--base); background: var(--accent);
+  border: 0; border-radius: 999px; padding: .65em 1.1em; cursor: pointer;
+}
+.btn.ghost { background: transparent; color: var(--text); box-shadow: 0 0 0 1px color-mix(in srgb, var(--muted) 45%, transparent) inset; }
+.btn[aria-pressed="true"] { background: var(--warn); color: var(--base); }
+.legend {
+  width: min(100%, 760px); display: grid; gap: 8px 18px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  margin: 0; padding: 16px 18px; border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent) inset;
+}
+.legend div { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+.legend dt { font: 700 .8rem/1.4 var(--font-mono); color: var(--accent); white-space: nowrap; min-width: 10.5ch; flex-shrink: 0; }
+.legend dd { margin: 0; color: var(--muted); font-size: .9rem; }
+.note { width: min(100%, 760px); color: var(--muted); font-size: .85rem; margin: 0; text-align: center; text-wrap: balance; }
+.note a { color: var(--accent); }
+.bare header, .bare .bar, .bare .legend, .bare .note { display: none; }
+.bare .wrap { padding-block: 26px 34px; }
+@media (prefers-reduced-motion: reduce) {
+  .led, .led.amber, .led.white { animation: none; }
+  .key, .g0 { transition: none; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Oyster<span class="os">OS</span> in your browser</h1>
+    <p class="lede">The Cardputer ADV running OysterOS, drawn with the firmware's own fonts, icons, colours and text. Press the keys on the device or type on your own keyboard.</p>
+  </header>
+
+  <div class="device" id="device" aria-label="M5Stack Cardputer ADV running OysterOS">
+    <span class="power" aria-hidden="true"></span>
+    <button class="g0" id="g0" aria-label="G0 button: lock screen"></button>
+    <span class="g0-label" aria-hidden="true">G0</span>
+    <span class="silk" aria-hidden="true">Cardputer&nbsp;ADV</span>
+    <span class="silk r" aria-hidden="true">ESP32-S3</span>
+    <span class="led amber" id="led" title="Status LED: Offline (amber, blinks every 2 s)" aria-hidden="true"></span>
+    <span class="speaker" aria-hidden="true"></span>
+    <div class="bezel">
+      <div class="screen">
+        <canvas id="lcd" width="240" height="135" role="img" aria-label="OysterOS screen"></canvas>
+              </div>
+    </div>
+    <div class="kbd" id="kbd"></div>
+  </div>
+
+  <div class="bar">
+    <div class="where" id="where"><b>OYSTER OS</b> · Home</div>
+    <div class="actions">
+      <button class="btn" id="tour" aria-pressed="false">Play the tour</button>
+      <button class="btn ghost" id="reset">Back to Home</button>
+    </div>
+  </div>
+
+  <dl class="legend">
+    <div><dt>; . , /</dt><dd>Move up, down, left, right (your arrow keys work too)</dd></div>
+    <div><dt>Enter</dt><dd>Open the selected tile or row</dd></div>
+    <div><dt>Del or `</dt><dd>Back one screen (Esc, Backspace)</dd></div>
+    <div><dt>1 – 9</dt><dd>Jump straight to a Home tile</dd></div>
+    <div><dt>Shift + /</dt><dd>Help for the current screen (or press ?)</dd></div>
+    <div><dt>Fn + Del</dt><dd>Home from anywhere (your Home key)</dd></div>
+    <div><dt>G0</dt><dd>Lock to the mascot screen; any key returns</dd></div>
+    <div><dt>Scratchpad</dt><dd>Press 9: the calculator and notes really work here</dd></div>
+  </dl>
+
+  <p class="note">A port of the firmware's drawing code with every string taken from the C++ source, in the state of a real unit: Wi-Fi on, laptop off, AI key stored, no SD card. Scans, IR, voice and AI answers need the real radio, so they show a notice here. <a href="https://github.com/Martysunshine/Cardputer-OysterOS" target="_blank" rel="noopener">Source on GitHub</a></p>
+</div>
+

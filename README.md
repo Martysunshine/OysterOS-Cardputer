@@ -16,6 +16,12 @@
   <img alt="Status" src="https://img.shields.io/badge/status-running%20on%20real%20hardware-5EEAD4?style=flat-square&labelColor=101923">
 </p>
 
+<p align="center">
+  <a href="docs/emulator/index.html">
+    <img src="assets/readme/cardputer-home.png" alt="The Cardputer ADV showing the OysterOS Home screen, tile 1 of 9 selected" width="82%">
+  </a>
+</p>
+
 ---
 
 **OysterOS** is a complete firmware plus companion stack that turns the
@@ -24,12 +30,12 @@ pocket terminal. It boots to its own home screen, joins your Wi-Fi by itself, an
 the laptop backend is an optional power-up, not a requirement.
 
 The project covers the whole chain: C++ firmware with a custom UI toolkit, a Python companion backend,
-an AI agent loop with typed tools, a pixel-accurate screen simulator, provisioning over USB serial, and
-about 2,500 automated tests (2,081 Python, 426 firmware unit tests).
+an AI agent loop with typed tools, a pixel-accurate screen simulator, a browser emulator, provisioning over
+USB serial, and about 2,500 automated tests (2,081 Python, 426 firmware unit tests).
 
 ## Contents
 
-- [The screens](#the-screens)
+- [See it run](#see-it-run)
 - [What each tile does](#what-each-tile-does)
 - [How it fits together](#how-it-fits-together)
 - [Lighting control](#lighting-control)
@@ -40,34 +46,105 @@ about 2,500 automated tests (2,081 Python, 426 firmware unit tests).
 - [Scope and safety](#scope-and-safety)
 - [Documentation](#documentation)
 
-## The screens
+## See it run
 
 <p align="center">
-  <img src="assets/readme/screens.png" alt="Six OysterOS screens: Home, Wi-Fi survey, Bluetooth explorer, Control Deck, Smart Home rooms and the IR remote" width="88%">
+  <a href="docs/emulator/index.html">
+    <img src="assets/readme/cardputer-demo.png" alt="Key presses moving through OysterOS: Home, Security, Oyster AI, the calculator, Smart Home, Red Team, the LED colours and the lock screen" width="82%">
+  </a>
 </p>
 
-<sub>Rendered by the project's own 240 × 135 simulator (hence the <code>SIMULATED</code> badge and demo data) —
-the same layout, fonts and colour tokens the firmware draws. Midnight navy, slate panels, a seafoam focus
-stripe, amber for warnings. The whole UI is painted through <b>one 240 × 16 pixel strip</b>; there is no
-full-screen framebuffer.</sub>
+**Try it yourself.** The whole interface runs in a browser: [`docs/emulator/index.html`](docs/emulator/index.html)
+is one self-contained file. Download it, open it, and press the keys on the drawn Cardputer or on your own
+keyboard. No install, no network.
+
+It is not a mock-up. The page is a port of the firmware's drawing code (`widgets.cpp`) using the firmware's
+own fonts, icons and colours, and every word on the screen comes from the C++ source, in the state of a real
+unit: Wi-Fi on, laptop off, AI key stored, no SD card. The Scratchpad calculator and notes really work; Wi-Fi
+scans, IR, voice and AI answers need the real radio, so the emulator says so instead of faking a result.
+Rebuild it after a firmware change with `python scripts/gen_emulator.py`.
 
 ## What each tile does
 
-Home is a two-column grid of nine tiles. Arrow keys move, <kbd>Enter</kbd> opens, <kbd>1</kbd>–<kbd>9</kbd>
-jump straight to a tile, <kbd>?</kbd> shows help, and the **G0** button locks the screen back to the animated
-mascot.
+Home is a two-column grid of nine tiles. The keys `; . , /` move (they carry arrow legends on the keyboard),
+<kbd>Enter</kbd> opens, <kbd>1</kbd>–<kbd>9</kbd> jump straight to a tile, <kbd>?</kbd> shows help, and the
+**G0** button locks the screen to the animated mascot. **Click a tile to see its real screen.**
 
-| | Tile | What it does | Needs the PC? |
-|:-:|---|---|:-:|
-| <img src="assets/readme/icons/security.png" width="32"> | **1 · Security** | Passive **Wi-Fi survey** (channels, signal, encryption) and a **Bluetooth LE explorer** (discover, inspect GATT services of your own lab devices). Findings are saved as evidence. | No |
-| <img src="assets/readme/icons/oysterai.png" width="32"> | **2 · Oyster AI** | Ask a question on the keyboard (or by voice through the backend). The answer comes **directly from the AI provider over the device's own Wi-Fi**; with the backend running, the AI can also call tools that make the Cardputer scan for it. | No |
-| <img src="assets/readme/icons/redteam.png" width="32"> | **3 · Red Team** | A sandboxed **Python interpreter** (PikaPython) on the device: run the built-in example or any `.py` from the SD card, with an `Oyster` module for logging and reading scan results. Also points to the separate offensive firmware for this board. | No |
-| <img src="assets/readme/icons/controldeck.png" width="32"> | **4 · Control** | A **Stream-Deck-style panel for your PC**: slots 1–9 run allowlisted actions (media keys, lock, Wake-on-LAN, service restart). Impactful slots need a confirmation on the device. | Yes |
-| <img src="assets/readme/icons/smarthome.png" width="32"> | **5 · Smart Home** | An **IR remote** for five TV families from the Cardputer's own IR LED, plus **lights, switches and locks through Home Assistant** — see [Lighting control](#lighting-control). | IR: no · HA: yes |
-| <img src="assets/readme/icons/apps.png" width="32"> | **6 · Original** | Explains how to go back to the factory firmware: one script restores the verified backup of your own chip, another brings OysterOS back. | — |
-| <img src="assets/readme/icons/scratchpad.png" width="32"> | **9 · Scratchpad** | An **offline calculator and notepad**. A big mint result display, amber operators, a history tape. Lives in RAM only: nothing is stored, nothing is sent. | No |
-| <img src="assets/readme/icons/settings.png" width="32"> | **7 · Settings** | Join a Wi-Fi network from the keyboard, brightness, storage, diagnostics, a key tester and the status-LED colour legend. | No |
-| | **8 · Help** | Every key, every screen, and what the LED colours mean. | No |
+<details>
+<summary><img src="assets/readme/icons/security.png" width="22" align="center">&nbsp; <b>1 · Security</b> — passive Wi-Fi survey and a Bluetooth LE explorer</summary>
+<br>
+<img src="assets/readme/screens/security.png" width="48%"> <img src="assets/readme/screens/wifi-survey.png" width="48%">
+
+A passive 2.4 GHz **Wi-Fi survey** (channels, signal, encryption, with a room label), a live wardriving scan,
+and a **Bluetooth LE explorer** that discovers advertisers and inspects the GATT services of your own enrolled
+lab devices. Every finding is saved as evidence. Works without the PC.
+</details>
+
+<details>
+<summary><img src="assets/readme/icons/oysterai.png" width="22" align="center">&nbsp; <b>2 · Oyster AI</b> — ask a question; the device asks the AI provider over its own Wi-Fi</summary>
+<br>
+<img src="assets/readme/screens/oyster-ai.png" width="48%"> <img src="assets/readme/screens/ai-asking.png" width="48%">
+
+Type a question (or speak it, through the backend). In **direct mode** the Cardputer holds its own key and
+talks TLS straight to the provider, with the laptop switched off. With the backend running, the AI can also
+call tools that make the Cardputer scan for it.
+</details>
+
+<details>
+<summary><img src="assets/readme/icons/redteam.png" width="22" align="center">&nbsp; <b>3 · Red Team</b> — Python scripting on the device</summary>
+<br>
+<img src="assets/readme/screens/red-team.png" width="48%"> <img src="assets/readme/screens/red-team-about.png" width="48%">
+
+A sandboxed **PikaPython** interpreter: run the built-in example, or any `.py` dropped into
+`/oyster/scripts/` on a microSD card, with an `Oyster` module for logging, delays and reading scan results.
+It also points to the separate offensive firmware for this board, which is deliberately not built in.
+</details>
+
+<details>
+<summary><img src="assets/readme/icons/controldeck.png" width="22" align="center">&nbsp; <b>4 · Control</b> — a shortcut deck for your PC</summary>
+<br>
+<img src="assets/readme/screens/control.png" width="48%">
+
+Slots 1–9 run allowlisted actions on your PC (media keys, lock, Wake-on-LAN, service restart); impactful
+slots ask for a confirmation on the device. Needs the companion backend, so with the laptop off it says
+`Backend offline. r:Retry`.
+</details>
+
+<details>
+<summary><img src="assets/readme/icons/smarthome.png" width="22" align="center">&nbsp; <b>5 · Smart Home</b> — TV remote from the IR LED, lights through Home Assistant</summary>
+<br>
+<img src="assets/readme/screens/smart-home.png" width="48%"> <img src="assets/readme/screens/ir-remote.png" width="48%">
+
+An **IR remote** for five TV families that works anywhere, plus rooms, lights, switches and locks from
+Home Assistant through the backend — see [Lighting control](#lighting-control).
+</details>
+
+<details>
+<summary><img src="assets/readme/icons/apps.png" width="22" align="center">&nbsp; <b>6 · Original</b> — the factory firmware, kept safe</summary>
+<br>
+<img src="assets/readme/screens/original.png" width="48%">
+
+Shows the original firmware kept in the backup slot and how to run it: one script restores the verified
+backup of your own chip, another brings OysterOS back.
+</details>
+
+<details>
+<summary><img src="assets/readme/icons/scratchpad.png" width="22" align="center">&nbsp; <b>9 · Scratchpad</b> — offline calculator and notepad</summary>
+<br>
+<img src="assets/readme/screens/scratchpad.png" width="48%"> <img src="assets/readme/screens/calculator.png" width="48%">
+
+A big mint result, amber operators, red errors and a history tape; plus a quick notepad. Lives in RAM only:
+nothing is stored, nothing is sent, and it always works.
+</details>
+
+<details>
+<summary><img src="assets/readme/icons/settings.png" width="22" align="center">&nbsp; <b>7 · Settings</b> and <b>8 · Help</b> — Wi-Fi, brightness, diagnostics, keys and LED colours</summary>
+<br>
+<img src="assets/readme/screens/settings.png" width="48%"> <img src="assets/readme/screens/led-colours.png" width="48%">
+
+Join a Wi-Fi network from the keyboard, adjust brightness, read storage and diagnostics, test keys. Help
+explains every key and what each colour of the status LED means.
+</details>
 
 ## How it fits together
 
@@ -145,6 +222,9 @@ Help).
   full backup of *that exact chip*. An attempt to dual-boot the factory firmware on the device was tested
   and documented as impossible (an ESP-IDF 5 app cannot be loaded by an ESP-IDF 4 bootloader, and the chip
   has one bootloader slot), so restoring is a one-command PC step instead.
+- **The firmware's screen runs in your browser.** The emulator in [`docs/emulator/`](docs/emulator/) ports
+  the firmware's band renderer, the LGFX shape routines, the two M5GFX bitmap fonts and the calculator to
+  JavaScript, so the screens in this README are pixel for pixel what the device draws.
 - **A simulator that tests the firmware's UI.** The Python simulator renders all 41 screens in five states;
   parity tests check that its tiles, footers and key hints match the C++ firmware.
 - **Scripts can't brick the device.** The Python sandbox has no network or file access beyond its one
@@ -194,6 +274,7 @@ Back to the factory firmware at any time: `.\scripts\original-restore.ps1 -Port 
 | [`firmware/`](firmware/) | PlatformIO project: the UI, modules (one file per tile), radio and TLS clients, and `lib/oyster_core` — portable logic with host-side unit tests |
 | [`backend/`](backend/) | FastAPI companion: agent loop and tool catalogue, evidence store, Control Deck, Home Assistant bridge, voice transcription, provisioning CLI |
 | [`simulator/`](simulator/) | The 240 × 135 UI simulator (headless PNG renders or a desktop window) |
+| [`docs/emulator/`](docs/emulator/) | The browser emulator: one self-contained page, built from `docs/emulator/src` by `scripts/gen_emulator.py` |
 | [`lab/`](lab/) | A simulated device and a BLE lab fixture for testing without hardware |
 | [`schemas/`](schemas/) | JSON schemas shared by firmware, backend and tests |
 | [`scripts/`](scripts/) | Setup, gate, build, backup, flash, restore, provisioning |
