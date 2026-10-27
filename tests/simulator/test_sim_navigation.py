@@ -39,7 +39,7 @@ def test_nav_01_back_from_any_leaf_screen_returns_to_its_parent(preview):
         assert s.cur == rt.parent, f"Back from {rt.id} landed on {s.cur}, expected {rt.parent}"
         assert s.modal is None
         checked += 1
-    assert checked == 35  # 40 routes - root - 2 overlays - 2 modals
+    assert checked == 36  # 41 routes - root - 2 overlays - 2 modals
     assert leaves <= {r.id for r in ROUTES}
 
 

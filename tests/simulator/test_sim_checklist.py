@@ -53,16 +53,15 @@ def test_scrolling_never_hides_the_focused_tile(sim):
         assert nav.top <= row < nav.top + th.TileRows
         y = th.ContentY + (row - nav.top) * th.TileH + 4
         assert pixel(sim, th.PadX, y) == th.Accent.rgb888
-    # 10 moves down a 4-row grid wrap around twice: row 2 of 0..3, so rows 0..2 are on screen
-    assert sim.nav("H01").sel == 4 and sim.nav("H01").top == 0
+    # 10 down-moves step the left column 0->2->4->6->8->0 (a 5-row grid); 10 is two full cycles back to 0
+    assert sim.nav("H01").sel == 0 and sim.nav("H01").top == 0
 
 
 def test_the_last_home_tile_scrolls_into_view_and_help_opens(sim):
-    for _ in range(3):
-        sim.press(".")  # tile rows 1..3 of the 4-row grid
-    assert sim.nav("H01").sel == 6 and sim.nav("H01").top == 1
-    sim.press("/")  # right column of the last row: Help
-    assert sim.nav("H01").sel == 7
+    for _ in range(4):
+        sim.press(".")  # down the left column of the 5-row grid to the last row
+    # Help is the last tile (index 8), alone in the bottom row, so the grid scrolls (top=2) to show it.
+    assert sim.nav("H01").sel == 8 and sim.nav("H01").top == 2
     sim.press("enter")
     assert sim.cur == "help"
 

@@ -63,7 +63,7 @@ ROUTES: tuple[Route, ...] = (
         None,
         "menu",
         "home",
-        shortcuts="12345678",
+        shortcuts="123456789",
         enter=(
             ("security", "S10"),
             ("ai", "A10"),
@@ -71,6 +71,7 @@ ROUTES: tuple[Route, ...] = (
             ("deck", "D10"),
             ("smart", "SH10"),
             ("original", "O10"),
+            ("scratchpad", "SC10"),
             ("settings", "P10"),
             ("help", HELP),
         ),
@@ -327,6 +328,15 @@ ROUTES: tuple[Route, ...] = (
         UNAVAILABLE,
         empty="Nothing to launch",
         error="Original launcher integration unavailable in simulator",
+    ),
+    # ---- Scratchpad -------------------------------------------------------------------------------------
+    _r(
+        "SC10",
+        "Scratchpad",
+        "H01",
+        "message",
+        "scratchpad",
+        empty="Nothing here",
     ),
     # ---- Settings ---------------------------------------------------------------------------------------
     _r(

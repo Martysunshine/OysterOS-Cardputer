@@ -15,7 +15,7 @@
 
 namespace oyster::modules {
 
-enum class Id : uint8_t { Hosts, Deck, SmartHome, Original, WifiSetup, WifiRecon, Count };
+enum class Id : uint8_t { Hosts, Deck, SmartHome, Original, WifiSetup, WifiRecon, Scratch, Count };
 constexpr uint8_t kCount = static_cast<uint8_t>(Id::Count);
 
 enum class PageKind : uint8_t {
@@ -25,6 +25,8 @@ enum class PageKind : uint8_t {
             // for the first 700 ms after the page appears (a key pressed before it was readable never answers it)
   Entry,    // text entry: `entry_prompt`, pre-filled with `entry_initial`, at most `entry_max` characters,
             // masked when `entry_secret`; Enter calls entry(text), Back calls back()
+  Calc,     // Scratchpad calculator: a bespoke colourful display (calc_* fields); Enter calls select(0),
+            // Back calls back(). Other modules never use this kind.
 };
 
 // What the UI draws for the current page. Filled by Ops::view() on every redraw: cheap, no I/O, no allocation.
@@ -44,6 +46,10 @@ struct PageView {
   char entry_initial[64] = {};
   uint8_t entry_max = 63;
   bool entry_secret = false;
+  char calc_expr[52] = {};    // Calc: the latest expression, drawn dim above the result
+  char calc_result[40] = {};  // Calc: the latest result (drawn big) or the error text
+  bool calc_ok = true;        // Calc: false = calc_result is an error (drawn in the error colour)
+                              // Calc history reuses `body`: "expr = result" lines, newest first
   char left[32] = {};   // action strip, "Key:Action ..." (leading '!' = alert style)
   char right[20] = {};
   bool busy = false;    // a backend call is running (the strip shows "working")
@@ -71,6 +77,7 @@ extern const Ops kSmartHomeOps;
 extern const Ops kOriginalOps;
 extern const Ops kWifiSetupOps;
 extern const Ops kWifiReconOps;
+extern const Ops kScratchOps;
 
 const Ops& ops(Id id);
 const char* name(Id id);

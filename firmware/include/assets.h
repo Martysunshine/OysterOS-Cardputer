@@ -14,6 +14,8 @@ enum class IconId : uint8_t {
   Wifi, Ble, Findings, Targets, Assess,
   // red-team tile (procedural red skull)
   RedTeam,
+  // scratchpad tile (procedural calculator, no source art)
+  Scratchpad,
   Count
 };
 

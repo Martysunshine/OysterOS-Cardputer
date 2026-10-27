@@ -27,6 +27,7 @@ HOME_TILES = (  # (key, label, icon, number, module), row-major as kHome in app_
     ("smart", "SmartHome", "SmartHome", 5, "smart"),
     ("linux", "Red Team", "RedTeam", 3, "linux"),
     ("original", "Original", "Apps", 6, "original"),
+    ("scratchpad", "Scratchpad", "Scratchpad", 9, "scratchpad"),
     ("settings", "Settings", "Settings", 7, "settings"),
     ("help", "Help", None, 8, "system"),
 )
@@ -133,7 +134,8 @@ def home(sim: Simulator, rt: Route, state: str) -> View:
     for key, label, icon, number, module in HOME_TILES:
         # Every module tile is in the firmware now (tile 3 = on-device WiFi recon; Original Apps = info tile).
         # All module tiles are enabled; none is greyed out.
-        built_modules = {"home", "security", "ai", "settings", "system", "linux", "deck", "smart", "original"}
+        built_modules = {"home", "security", "ai", "settings", "system", "linux", "deck", "smart", "original",
+                         "scratchpad"}
         enabled = module in built_modules or (sim.preview and state != "disabled")
         if key == "security":
             what = "scanning" if sim.task and sim.task.kind in ("wifi", "ble") else "Wi-Fi, BLE"
@@ -160,7 +162,7 @@ def home(sim: Simulator, rt: Route, state: str) -> View:
     title = "OYSTER OS"
     if state == "error" or sim.faults:
         title = "!FAILED: " + ",".join(sorted(f.upper() for f in sim.faults or {"BLE"}))
-    return View("tiles", title, rows=rows, columns=2, shortcuts="12345678", state=state)
+    return View("tiles", title, rows=rows, columns=2, shortcuts="123456789", state=state)
 
 
 def security(sim: Simulator, rt: Route, state: str) -> View:
@@ -704,6 +706,16 @@ def entry_view(sim: Simulator, rt: Route, state: str) -> View:
     )
 
 
+def scratchpad(sim: Simulator, rt: Route, state: str) -> View:
+    # Offline calculator + notepad: self-contained, no backend or radio, so it is always available.
+    return _msg(
+        "Scratchpad",
+        "An offline calculator and a quick notepad.\nCalculator / Notes / Clear all.\n"
+        "Nothing is saved - it clears on reboot. Works with the laptop off.",
+        state,
+    )
+
+
 # ---- dispatch ---------------------------------------------------------------------------------------------
 
 # route id -> (builder, states the builder draws itself)
@@ -736,6 +748,7 @@ BUILDERS: dict[str, tuple[Callable[..., View], tuple[str, ...]]] = {
     "SH11": (smart_devices, ("normal", "empty")),
     "SH12": (smart_ir, ("normal", "empty")),
     "O10": (original, ("normal", "error", "empty")),
+    "SC10": (scratchpad, ("normal",)),
     "P10": (settings, ("normal", "empty")),
     "P11": (key_tester, ("normal",)),
     "settings_backend": (detail_text, ("normal",)),

@@ -90,6 +90,18 @@ void draw_confirm(const char* operation, const char* target, const char* effect)
 void draw_message(const char* title, const char* body, uint16_t first_line = 0, uint16_t total_lines = 0);
 uint16_t wrapped_line_count(const char* body);                 // lines body occupies at kTextCols
 const char* skip_wrapped_lines(const char* body, uint16_t n);  // start of wrapped line n (for scrolling)
+// Calculator (Scratchpad): heading, then a framed display with the expression (dim) over a big result
+// (accent, or the error colour when !ok), an operator legend and the previous calculation. The big
+// result is drawn straight to the display at 2x (it is taller than the band).
+struct CalcModel {
+  const char* title;
+  const char* expr;     // latest expression, may be ""
+  const char* result;   // latest result or error text
+  bool ok;              // false: result is an error
+  const char* history;  // "expr = result" lines, newest first (the first is the current one), may be nullptr
+};
+void draw_calc(const CalcModel& m);
+
 // Text entry: 4 text rows with a block caret, then `hint` (default: the character count).
 void draw_text_entry(const char* prompt, const char* buffer, size_t cursor, const char* hint = nullptr);
 

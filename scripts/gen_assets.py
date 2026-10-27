@@ -91,6 +91,7 @@ ICON_SOURCES = [
     ("Targets", "sheet_features_v1.png", 1, 1),
     ("Assess", "sheet_features_v1.png", 1, 2),
     ("RedTeam", "@skull", 0, 0),  # procedural red skull (no source art); see make_skull_tile
+    ("Scratchpad", "@calc", 0, 0),  # procedural calculator (no source art); see make_calc_tile
 ]
 
 
@@ -271,8 +272,10 @@ def make_skull_tile(size: int) -> list[int]:
 
     solid = Image.new("L", (w, w), 0)
     sd = ImageDraw.Draw(solid)
-    sd.rounded_rectangle([cx - cran_w / 2, top, cx + cran_w / 2, top + cran_h], radius=cran_w * 0.46, fill=255)
-    sd.rounded_rectangle([cx - jaw_w / 2, jaw_top, cx + jaw_w / 2, jaw_top + jaw_h], radius=jaw_w * 0.34, fill=255)
+    sd.rounded_rectangle([cx - cran_w / 2, top, cx + cran_w / 2, top + cran_h],
+                         radius=cran_w * 0.46, fill=255)
+    sd.rounded_rectangle([cx - jaw_w / 2, jaw_top, cx + jaw_w / 2, jaw_top + jaw_h],
+                         radius=jaw_w * 0.34, fill=255)
 
     holes = Image.new("L", (w, w), 0)
     hd = ImageDraw.Draw(holes)
@@ -288,7 +291,8 @@ def make_skull_tile(size: int) -> list[int]:
     gap = jaw_w * 0.22
     for i in (-1, 0, 1):
         tx = cx + i * gap
-        hd.rectangle([tx - jaw_w * 0.035, jaw_top + jaw_h * 0.05, tx + jaw_w * 0.035, jaw_top + jaw_h * 0.9], fill=255)
+        hd.rectangle([tx - jaw_w * 0.035, jaw_top + jaw_h * 0.05, tx + jaw_w * 0.035, jaw_top + jaw_h * 0.9],
+                     fill=255)
 
     alpha = ImageChops.subtract(solid, holes).resize((size, size), Image.BOX)
     out = []
@@ -298,6 +302,58 @@ def make_skull_tile(size: int) -> list[int]:
             continue
         t = min(255, a)
         out.append(rgb565(*[(red[c] * t + PANEL[c] * (255 - t) + 127) // 255 for c in range(3)]))
+    return out
+
+
+# ---- procedural calculator (Scratchpad tile; no source art) -----------------------------------------
+
+
+def make_calc_tile(size: int) -> list[int]:
+    """A flat calculator drawn with primitives: a rounded body in the accent colour with a screen bar and a
+    3x3 grid of keys keyed out so the tile background shows through. Antialiased at 6x then area-averaged
+    down; edges blend towards PANEL, outside the body is the transparent key. No external art."""
+    s = 6
+    w = size * s
+    mx = w * 0.18
+    top = w * 0.08
+    bot = w * 0.92
+    body_l = mx
+    body_r = w - mx
+    radius = (body_r - body_l) * 0.18
+
+    solid = Image.new("L", (w, w), 0)
+    sd = ImageDraw.Draw(solid)
+    sd.rounded_rectangle([body_l, top, body_r, bot], radius=radius, fill=255)
+
+    holes = Image.new("L", (w, w), 0)
+    hd = ImageDraw.Draw(holes)
+    pad = (body_r - body_l) * 0.16
+    screen_top = top + (bot - top) * 0.10
+    screen_bot = top + (bot - top) * 0.32
+    hd.rounded_rectangle([body_l + pad, screen_top, body_r - pad, screen_bot],
+                         radius=(screen_bot - screen_top) * 0.25, fill=255)
+    keys_top = top + (bot - top) * 0.44
+    keys_bot = bot - (bot - top) * 0.10
+    cols, rows = 3, 3
+    gx0 = body_l + pad
+    gx1 = body_r - pad
+    cell_w = (gx1 - gx0) / cols
+    cell_h = (keys_bot - keys_top) / rows
+    kr = min(cell_w, cell_h) * 0.30
+    for r in range(rows):
+        for c in range(cols):
+            cxk = gx0 + cell_w * (c + 0.5)
+            cyk = keys_top + cell_h * (r + 0.5)
+            hd.ellipse([cxk - kr, cyk - kr, cxk + kr, cyk + kr], fill=255)
+
+    alpha = ImageChops.subtract(solid, holes).resize((size, size), Image.BOX)
+    out = []
+    for a in pixels(alpha):
+        if a < MIN_COVER:
+            out.append(TRANSPARENT)
+            continue
+        t = min(255, a)
+        out.append(rgb565(*[(ACCENT[cc] * t + PANEL[cc] * (255 - t) + 127) // 255 for cc in range(3)]))
     return out
 
 
@@ -545,6 +601,9 @@ def build() -> tuple[dict[str, list[int]], list[int], list[int], list[int]]:
             continue
         if fname == "@skull":
             icons[name] = make_skull_tile(ICON_PX)
+            continue
+        if fname == "@calc":
+            icons[name] = make_calc_tile(ICON_PX)
             continue
         if fname not in sheets:
             sheets[fname] = Image.open(RAW / fname).convert("RGB")

@@ -170,7 +170,7 @@ def test_static_labels_exist_in_the_firmware_source():
         "IN PROGRESS",
         "CONFIRM ACTION",
         "Ent:Approve Del:Reject",
-        "?:Help 1-8:Open",
+        "?:Help 1-9:Open",
         "Del:Back ;.:Scroll",
         "Ent:OK Del:Erase",
     ]
@@ -205,6 +205,7 @@ def test_every_home_tile_is_enabled(sim, preview):
         "SmartHome": True,
         "Red Team": True,
         "Original": True,
+        "Scratchpad": True,
         "Settings": True,
         "Help": True,
     }

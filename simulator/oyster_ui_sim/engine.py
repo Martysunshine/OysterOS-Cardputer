@@ -851,7 +851,7 @@ class Simulator:
     def _default_footer(self, v: View) -> tuple[str, str]:
         rid = self.cur
         if v.kind == "tiles" and rid == HOME:
-            return "?:Help 1-8:Open", "Ent:Open"
+            return "?:Help 1-9:Open", "Ent:Open"
         if v.kind == "entry":
             return "Ent:OK Del:Erase", f"{len(self.entry.buffer)}/{self.entry.max_len}"
         if v.kind == "message":

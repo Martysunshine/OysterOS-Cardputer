@@ -139,7 +139,7 @@ struct OpTrack {
 
 // Home (H01): the OysterOS modules as a 2-column tile grid, row-major. Numbers follow the H01 wireframe
 // (column 1: 1-3, column 2: 4-6), then 7 Settings and 8 Help in a fourth row (scrolled into view).
-enum class HomeItem : uint8_t { Security, ControlDeck, OysterAi, SmartHome, RedTeam, OriginalApps, Settings, Help };
+enum class HomeItem : uint8_t { Security, ControlDeck, OysterAi, SmartHome, RedTeam, OriginalApps, Scratchpad, Settings, Help };
 struct HomeTile {
   HomeItem item;
   uint8_t number;
@@ -153,6 +153,7 @@ const HomeTile kHome[] = {
     {HomeItem::SmartHome, 5, "SmartHome", assets::IconId::SmartHome},
     {HomeItem::RedTeam, 3, "Red Team", assets::IconId::RedTeam},
     {HomeItem::OriginalApps, 6, "Original", assets::IconId::Apps},
+    {HomeItem::Scratchpad, 9, "Scratchpad", assets::IconId::Scratchpad},
     {HomeItem::Settings, 7, "Settings", assets::IconId::Settings},
     {HomeItem::Help, 8, "Help", assets::IconId::Count},
 };
@@ -1137,7 +1138,7 @@ void build_keys(Body& b) {
   b.add("Help: ? (Shift+/). Not in text entry.\n");
   b.add("Cancel a task: Fn+` or Ctrl+C, on every screen.\n");
   b.add("Text entry: Del erases, Del on empty leaves, Fn+, / move the caret.\n");
-  b.add("Home screen: 1-8 open a tile.\n");
+  b.add("Home screen: 1-9 open a tile.\n");
   b.add("Settings > Key tester shows what each key does. Record results in docs/HARDWARE_VERIFICATION.md.");
 }
 
@@ -1149,7 +1150,7 @@ void build_keyboard(char* out, size_t n) {
 // Design screen id and a one-line hint for the Help screen.
 const char* screen_hint(Screen s, const char** name) {
   switch (s) {
-    case Screen::MainMenu: *name = "Home [H01]"; return "Arrows move between tiles, Enter opens, 1-8 open directly.";
+    case Screen::MainMenu: *name = "Home [H01]"; return "Arrows move between tiles, Enter opens, 1-9 open directly.";
     case Screen::Security: *name = "Security [S10]"; return "Pick a tool. Enter opens it.";
     case Screen::WifiSurvey:
       *name = "Wi-Fi Survey [S11]";
@@ -1718,6 +1719,7 @@ void home_action(uint8_t idx) {
     case HomeItem::ControlDeck: open_module(modules::Id::Deck); break;
     case HomeItem::SmartHome: open_module(modules::Id::SmartHome); break;
     case HomeItem::OriginalApps: open_module(modules::Id::Original); break;
+    case HomeItem::Scratchpad: open_module(modules::Id::Scratch); break;
   }
 }
 
@@ -2584,6 +2586,7 @@ void render_home(const ListNav& nv) {
       case HomeItem::ControlDeck: mod = modules::Id::Deck; has_mod = true; break;
       case HomeItem::SmartHome: mod = modules::Id::SmartHome; has_mod = true; break;
       case HomeItem::OriginalApps: mod = modules::Id::Original; has_mod = true; break;
+      case HomeItem::Scratchpad: mod = modules::Id::Scratch; has_mod = true; break;
     }
     if (has_mod) {
       modules::tile_status(mod, mod_text, sizeof(mod_text));
@@ -2832,6 +2835,10 @@ void render_content(uint32_t now) {
         case modules::PageKind::Confirm:
           ui::draw_confirm(s_view.confirm_operation, s_view.confirm_target, s_view.confirm_effect);
           break;
+        case modules::PageKind::Calc:
+          ui::draw_calc(ui::CalcModel{s_view.title, s_view.calc_expr, s_view.calc_result, s_view.calc_ok,
+                                      s_view.body});
+          break;
       }
       break;
     case Screen::LedLegend:
@@ -2873,7 +2880,7 @@ void default_footer(char* left, size_t ln, char* right, size_t rn) {
     case Screen::Provisioning: std::snprintf(left, ln, "USB provisioning active"); break;
     // Key hints "Key:Action" (ui::draw_footer colours the key). Back is always named the same way.
     case Screen::MainMenu:
-      std::snprintf(left, ln, "?:Help 1-8:Open");
+      std::snprintf(left, ln, "?:Help 1-9:Open");
       std::snprintf(right, rn, "Ent:Open");
       break;
     case Screen::WifiResults:

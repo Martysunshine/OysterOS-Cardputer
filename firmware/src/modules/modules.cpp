@@ -28,6 +28,7 @@ const Ops* table(Id id) {
     case Id::Original: return &kOriginalOps;
     case Id::WifiSetup: return &kWifiSetupOps;
     case Id::WifiRecon: return &kWifiReconOps;
+    case Id::Scratch: return &kScratchOps;
     case Id::Count: break;
   }
   return nullptr;

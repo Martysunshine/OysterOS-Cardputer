@@ -550,6 +550,81 @@ void draw_message(const char* title, const char* body, uint16_t first_line, uint
   }
 }
 
+namespace {
+
+bool calc_operator(char c) { return c == '+' || c == '-' || c == '*' || c == '/' || c == '%'; }
+
+// One line in the 8x16 font straight to the display, coloured per character: operators in the warning
+// colour, parentheses in the accent, everything else in `fg`. Left-aligned at (x, y).
+void calc_line(const char* s, int x, int y, uint16_t fg) {
+  auto& d = M5Cardputer.Display;
+  char ch[2] = {0, 0};
+  for (const char* p = s; *p != '\0'; ++p, x += kBodyW) {
+    if (*p == ' ') continue;
+    ch[0] = *p;
+    d.setTextColor(calc_operator(*p) ? kWarning : (*p == '(' || *p == ')') ? kAccent : fg);
+    d.drawString(ch, x, y);
+  }
+}
+
+}  // namespace
+
+// The content area is painted straight to the display (not through the band): the result is drawn at 2x,
+// 32 px tall, which does not fit the 16 px band. Every other screen repaints all of its rows, so nothing of
+// this one is left behind when the page changes.
+void draw_calc(const CalcModel& m) {
+  if (!s_ready) return;
+  heading(m.title, nullptr);
+
+  auto& d = M5Cardputer.Display;
+  const int gap_y = kHeadingY + kHeadingH;
+  d.fillRect(0, gap_y, kScreenW, kContentY - gap_y, kSurfaceBase);
+  pad_rows(kContentY, kContentH);
+  const int end = kContentY + kContentH;
+  d.fillRect(0, end, kScreenW, kFooterY - end, kSurfaceBase);
+
+  // The display: a dark inset with an accent frame, expression on top, result below.
+  const int dx = kPadX + 4, dw = kInnerW - 8;
+  const int dy = kContentY + 2, dh = 50;
+  d.fillRoundRect(dx, dy, dw, dh, 4, kSurfaceBase);
+  d.drawRoundRect(dx, dy, dw, dh, 4, kAccent);
+  const int right = dx + dw - 8;
+  const int cols = (dw - 16) / kBodyW;  // 8x16 characters that fit inside the frame
+
+  d.setTextWrap(false);
+  d.setFont(&fonts::AsciiFont8x16);
+  d.setTextSize(1);
+  d.setTextDatum(lgfx::textdatum_t::top_right);
+  char buf[48];
+  fit(m.expr ? m.expr : "", SIZE_MAX, buf, cols);
+  d.setTextColor(kTextMuted);
+  d.drawString(buf, right, dy + 3);
+
+  const char* res = (m.result != nullptr && m.result[0] != '\0') ? m.result : "0";
+  d.setTextColor(m.ok ? kAccent : kError);
+  if (static_cast<int>(std::strlen(res)) * 2 <= cols) {
+    d.setTextSize(2);
+    d.drawString(res, right, dy + 17);
+    d.setTextSize(1);
+  } else {
+    fit(res, SIZE_MAX, buf, cols);
+    d.drawString(buf, right, dy + 24);
+  }
+
+  // Below the display: what can be typed, then the previous calculation.
+  d.setTextDatum(lgfx::textdatum_t::top_left);
+  const int lx = kPadX + 6;
+  const int ly = dy + dh + 1;
+  calc_line("+  -  *  /  %  ( )", lx, ly, kTextMuted);
+  const char* hist = m.history != nullptr ? m.history : "";
+  const char* nl = std::strchr(hist, '\n');
+  const char* prev = nl != nullptr ? nl + 1 : "";
+  size_t plen = 0;
+  while (prev[plen] != '\0' && prev[plen] != '\n') ++plen;
+  fit(prev, plen, buf, kTextCols);
+  calc_line(buf, lx, ly + kBodyH, kTextMuted);
+}
+
 void draw_text_entry(const char* prompt, const char* buffer, size_t cursor, const char* hint) {
   if (!s_ready) return;
   heading(prompt, nullptr);

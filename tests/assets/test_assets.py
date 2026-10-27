@@ -87,7 +87,7 @@ def test_loader_animation_shape_and_placement():
 
 def test_flash_budget():
     total = sum(len(v) * 2 for v in _arrays().values())
-    assert total == 12 * 1152 + 48 * 48 * 2 + SPLASH_W * SPLASH_H * 2 + 8 * 80 * 80 * 2
+    assert total == len(_icon_ids()) * 1152 + 48 * 48 * 2 + SPLASH_W * SPLASH_H * 2 + 8 * 80 * 80 * 2
     assert total < FLASH_BUDGET_BYTES
 
 
@@ -171,7 +171,9 @@ def test_committed_pngs_have_no_ancillary_chunks_and_are_small():
 def test_no_personal_data_in_assets_text_files():
     for path in (GEN_CPP, SCRIPT, PROVENANCE):
         text = path.read_text(encoding="utf-8")
-        assert "@" not in text, path.name
+        # No real email address (the guard against the owner's address leaking in). The generator's own
+        # procedural-icon markers ("@skull", "@calc") are not addresses, so match an address shape, not "@".
+        assert not re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", text), path.name
         assert "C:\\Users" not in text and "C:/Users" not in text, path.name
 
 

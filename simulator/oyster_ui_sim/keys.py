@@ -193,7 +193,7 @@ def is_key_edge(k: KeySnapshot, events: list[tuple[NavEvent, str]]) -> bool:
 
 @dataclass(frozen=True)
 class Binding:
-    action: str  # Action name, or SHORTCUT_1-8
+    action: str  # Action name, or SHORTCUT_1-9
     keys: tuple[str, ...]  # physical chords (script syntax), the proposed bindings
     shows: str  # text for the legend
     scope: str
@@ -220,7 +220,7 @@ KEY_TABLE: tuple[Binding, ...] = (
     ),
     Binding("ERASE", ("del",), "Del", "text entry; on an empty buffer it leaves", "Backspace"),
     Binding("TEXT_INPUT", ("a",), "printable keys", "text entry (hotkeys in menus)", "keyboard"),
-    Binding("SHORTCUT_1-8", ("1", "8"), "1-8", "Home only, advertised in the footer", "digits"),
+    Binding("SHORTCUT_1-9", ("1", "9"), "1-9", "Home only, advertised in the footer", "digits"),
 )
 
 # ---- chord parsing (scripts, legend self-test, emulator) ------------------------------------------------
