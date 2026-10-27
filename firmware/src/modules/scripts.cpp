@@ -42,23 +42,23 @@ constexpr uint8_t kCallRunBuiltin = 3;   // run the compiled-in example (no SD)
 // Restored Red Team reference plus a runnable example compiled into the firmware, so the tile is useful
 // with no SD card. Any .py files on a microSD card under /oyster/scripts are listed after these two rows.
 const char* const kAboutText =
-    "Scripting runs on the device with the laptop off (PikaScript).\r\n"
-    "Bindings: Oyster.log(text), Oyster.sleep_ms(ms), Oyster.wifi_ap_count().\r\n"
-    "Add your own .py files under /oyster/scripts on a microSD card and they appear here.\r\n\r\n"
-    "Full offensive Wi-Fi firmware for this board is a separate project you flash yourself:\r\n"
-    "Evil-M5Project by 7h30th3r0n3\r\n"
-    "github.com/7h30th3r0n3/Evil-M5Project\r\n\r\n"
+    "Scripting runs on the device with the laptop off (PikaScript).\n"
+    "Bindings: o = Oyster.Oyster(), then o.log(text), o.sleep_ms(ms), o.wifi_ap_count().\n"
+    "Add your own .py files under /oyster/scripts on a microSD card and they appear here.\n\n"
+    "Full offensive Wi-Fi firmware for this board is a separate project you flash yourself:\n"
+    "Evil-M5Project by 7h30th3r0n3\n"
+    "github.com/7h30th3r0n3/Evil-M5Project\n\n"
     "Its attacks (deauth, captive portals, Karma, beacon spam) are not built into Oyster.";
 
 const char* const kExampleSource =
     "import Oyster\n"
     "o = Oyster.Oyster()\n"
-    "o.log(\"Hello from Oyster scripting.\\r\\n\")\n"
-    "o.log(\"Counting Wi-Fi APs...\\r\\n\")\n"
+    "o.log(\"Hello from Oyster scripting.\\n\")\n"
+    "o.log(\"Counting Wi-Fi APs...\\n\")\n"
     "n = o.wifi_ap_count()\n"
     "print(n)\n"
     "o.sleep_ms(200)\n"
-    "o.log(\"Done.\\r\\n\")\n";
+    "o.log(\"Done.\\n\")\n";
 
 enum class Level : uint8_t { List, Result };
 
@@ -227,7 +227,7 @@ void mod_call(uint8_t call_id, const char* arg) {
   // connection), so that RAM stays free for the mbedTLS handshake the rest of the time.
   char* source = static_cast<char*>(malloc(kSourceCap));
   if (source == nullptr) {
-    oyster_script_log("Out of memory to load the script\r\n");
+    oyster_script_log("Out of memory to load the script\n");
   } else {
     source[0] = '\0';
     if (call_id == kCallRunBuiltin) {
@@ -238,12 +238,12 @@ void mod_call(uint8_t call_id, const char* arg) {
       if (full_path(arg, path, sizeof(path))) {
         File f = SD.open(path, FILE_READ);
         if (!f) {
-          oyster_script_log("Could not open the script file\r\n");
+          oyster_script_log("Could not open the script file\n");
         } else {
           const size_t size = static_cast<size_t>(f.size());
           if (size >= kSourceCap) {
             char msg[96];
-            std::snprintf(msg, sizeof(msg), "Script too large: %u bytes (max %u)\r\n",
+            std::snprintf(msg, sizeof(msg), "Script too large: %u bytes (max %u)\n",
                           static_cast<unsigned>(size), static_cast<unsigned>(kSourceCap - 1));
             oyster_script_log(msg);
           } else {
@@ -257,7 +257,7 @@ void mod_call(uint8_t call_id, const char* arg) {
     if (source[0] != '\0') {
       PikaObj* root = newRootObj(const_cast<char*>("pikaMain"), New_PikaMain);
       if (root == nullptr) {
-        oyster_script_log("Could not start the interpreter (out of memory)\r\n");
+        oyster_script_log("Could not start the interpreter (out of memory)\n");
       } else {
         pikaVM_run(root, source);
         ok = !scripts::cancel_requested();

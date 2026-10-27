@@ -64,7 +64,7 @@ bool cancel_requested() { return s_cancel.load(); }
 
 namespace {
 
-void append_log(const char* text, size_t len) {
+void append_raw(const char* text, size_t len) {
   using oyster::modules::Guard;
   Guard g;
   if (len == 0) return;
@@ -83,6 +83,18 @@ void append_log(const char* text, size_t len) {
   std::memcpy(oyster::scripts::s_log + oyster::scripts::s_log_len, text, len);
   oyster::scripts::s_log_len += len;
   oyster::scripts::s_log[oyster::scripts::s_log_len] = '\0';
+}
+
+// The screen's text renderer draws any non-printable byte as '?', so the CR of CR LF line endings (the
+// interpreter's print() and scripts that copy desktop habits) is dropped here and only LF breaks a line.
+void append_log(const char* text, size_t len) {
+  size_t start = 0;
+  while (start < len) {
+    size_t end = start;
+    while (end < len && text[end] != '\r') ++end;
+    if (end > start) append_raw(text + start, end - start);
+    start = end + 1;
+  }
 }
 
 }  // namespace
