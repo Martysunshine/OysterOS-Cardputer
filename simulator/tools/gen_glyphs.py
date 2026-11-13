@@ -17,7 +17,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-DEFAULT_LIB = REPO / "firmware" / ".pio" / "libdeps" / "cardputer-adv" / "M5GFX"
+_DEPS = REPO / "firmware" / ".pio" / "libdeps" / "cardputer-adv"
+# PlatformIO keeps the pinned copy as M5GFX@<version> when a newer release is installed next to it.
+DEFAULT_LIB = next(iter(sorted(_DEPS.glob("M5GFX@*"))), _DEPS / "M5GFX")
 OUT = REPO / "simulator" / "oyster_ui_sim" / "glyphs.py"
 FIRST, LAST = 0x20, 0x7E
 

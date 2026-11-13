@@ -19,6 +19,18 @@ from oyster_ui_sim.theme import (
 )
 from sim_support import DOCS, FIRMWARE, read
 
+
+def pinned_m5gfx():
+    """The M5GFX copy the firmware pins.
+
+    When a newer release exists, PlatformIO also downloads it for a dependency that asks for "any version"
+    and then keeps the pinned copy as `M5GFX@<version>`. The firmware links the pinned one, so read that.
+    """
+    deps = FIRMWARE / ".pio" / "libdeps" / "cardputer-adv"
+    pinned = sorted(deps.glob("M5GFX@*"))
+    return pinned[0] if pinned else deps / "M5GFX"
+
+
 TOKENS = {  # DESIGN_SYSTEM.md token name -> ui_theme.h constant
     "Background": "kSurfaceBase",
     "Panel": "kSurfacePanel",
@@ -122,7 +134,7 @@ def test_unknown_characters_draw_as_a_question_mark():
 
 
 def test_glyph_module_matches_the_pinned_m5gfx_source():
-    lib = FIRMWARE / ".pio" / "libdeps" / "cardputer-adv" / "M5GFX"
+    lib = pinned_m5gfx()
     if not lib.is_dir():
         pytest.skip("PlatformIO library cache not present")
     import importlib.util
@@ -166,7 +178,7 @@ def test_icon_parsing_fails_loudly_on_a_missing_array(monkeypatch, tmp_path):
 
 
 def test_readme_carries_the_licence_texts_of_the_extracted_glyph_data():
-    lib = FIRMWARE / ".pio" / "libdeps" / "cardputer-adv" / "M5GFX"
+    lib = pinned_m5gfx()
     if not lib.is_dir():
         pytest.skip("PlatformIO library cache not present")
 
