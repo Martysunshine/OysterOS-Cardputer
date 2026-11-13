@@ -50,4 +50,4 @@ The first public release.
 | 2026-10-26 | Status LED, voice, Wi-Fi join on the device, on-device recon, AI over the device's own Wi-Fi |
 | 2026-10-27 | Scratchpad, on-device Python scripting, browser emulator |
 
-[0.1.0]: https://github.com/Martysunshine/OysterOS/releases/tag/v0.1.0
+[0.1.0]: https://github.com/Martysunshine/OysterOS-Cardputer/releases/tag/v0.1.0

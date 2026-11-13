@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://martysunshine.github.io/OysterOS/">
+  <a href="https://martysunshine.github.io/OysterOS-Cardputer/">
     <img src="assets/brand/hero.png" alt="OysterOS: a pocket operating system for security, AI and automation, running on the M5Stack Cardputer ADV" width="100%">
   </a>
 </p>
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://martysunshine.github.io/OysterOS/"><img alt="Try it live in your browser" src="https://img.shields.io/badge/%E2%96%B6%20%20try%20it%20live-in%20your%20browser-5EEAD4?style=for-the-badge&labelColor=101923"></a>
+  <a href="https://martysunshine.github.io/OysterOS-Cardputer/"><img alt="Try it live in your browser" src="https://img.shields.io/badge/%E2%96%B6%20%20try%20it%20live-in%20your%20browser-5EEAD4?style=for-the-badge&labelColor=101923"></a>
 </p>
 
 <p align="center">
@@ -47,11 +47,11 @@ serial and about 2,500 automated tests. It runs on a real Cardputer ADV: it boot
 over USB and answers AI questions with the laptop switched off.
 
 <p align="center">
-  <a href="https://martysunshine.github.io/OysterOS/">
+  <a href="https://martysunshine.github.io/OysterOS-Cardputer/">
     <img src="assets/readme/cardputer-demo.png" alt="Key presses moving through OysterOS: Home, Security, Oyster AI, the calculator, Smart Home, Red Team, the LED colours and the lock screen" width="78%">
   </a>
   <br>
-  <sub>The firmware's own drawing code, ported to JavaScript. <a href="https://martysunshine.github.io/OysterOS/">Press the keys yourself</a>.</sub>
+  <sub>The firmware's own drawing code, ported to JavaScript. <a href="https://martysunshine.github.io/OysterOS-Cardputer/">Press the keys yourself</a>.</sub>
 </p>
 
 ## Why it is different
@@ -263,7 +263,7 @@ There are three ways in, from zero install to real hardware.
 
 ### 1 · In your browser — nothing to install
 
-Open the **[live emulator](https://martysunshine.github.io/OysterOS/)** and press the keys on the drawn
+Open the **[live emulator](https://martysunshine.github.io/OysterOS-Cardputer/)** and press the keys on the drawn
 Cardputer or on your own keyboard. Offline works too: download
 [`docs/emulator/index.html`](docs/emulator/index.html), one self-contained file, and open it.
 
@@ -274,8 +274,8 @@ You need Windows 10 or 11, PowerShell, [Git](https://git-scm.com/) and
 ESP32-S3 toolchain, a few hundred megabytes.
 
 ```powershell
-git clone https://github.com/Martysunshine/OysterOS.git
-cd OysterOS
+git clone https://github.com/Martysunshine/OysterOS-Cardputer.git
+cd OysterOS-Cardputer
 .\scripts\setup.ps1          # Python environment, tools and the pinned ESP32-S3 toolchain
 .\scripts\check.ps1          # lint, about 2,500 tests and a firmware build
 .\scripts\ui-sim.ps1         # click through every screen on the PC
