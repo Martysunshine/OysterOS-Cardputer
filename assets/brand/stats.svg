@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 170" width="1200" height="170" role="img" aria-labelledby="t d">
+  <title id="t">OysterOS by the numbers</title>
+  <desc id="d">9 tiles on the Home screen. More than 2,500 automated tests. A 240 by 135 pixel display. About 56 kilobytes of free heap at runtime. One 7,680 byte strip paints the whole interface.</desc>
+  <defs>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b1446"/>
+      <stop offset="0.6" stop-color="#121a33"/>
+      <stop offset="1" stop-color="#101923"/>
+    </linearGradient>
+    <linearGradient id="num" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EFE9FF"/>
+      <stop offset="1" stop-color="#5EEAD4"/>
+    </linearGradient>
+    <style>
+      .sans { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; }
+      .mono { font-family: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace; }
+      .num { font-size: 40px; font-weight: 700; fill: url(#num); }
+      .lab { font-size: 14px; fill: #B9B4DA; }
+    </style>
+  </defs>
+  <rect x="1" y="1" width="1198" height="168" rx="22" fill="url(#card)" stroke="#2C2F5E" stroke-width="2"/>
+  <g stroke="#2C2F5E" stroke-width="1.5">
+    <line x1="240" y1="38" x2="240" y2="132"/>
+    <line x1="480" y1="38" x2="480" y2="132"/>
+    <line x1="720" y1="38" x2="720" y2="132"/>
+    <line x1="960" y1="38" x2="960" y2="132"/>
+  </g>
+  <g text-anchor="middle">
+    <text x="120" y="84" class="mono num">9</text>
+    <text x="120" y="114" class="sans lab">tiles on the Home screen</text>
+
+    <text x="360" y="84" class="mono num">2,500+</text>
+    <text x="360" y="114" class="sans lab">automated tests</text>
+
+    <text x="600" y="84" class="mono num">240 × 135</text>
+    <text x="600" y="114" class="sans lab">pixels of screen</text>
+
+    <text x="840" y="84" class="mono num">~56 KB</text>
+    <text x="840" y="114" class="sans lab">free heap at runtime</text>
+
+    <text x="1080" y="84" class="mono num">7,680 B</text>
+    <text x="1080" y="114" class="sans lab">one strip paints the whole UI</text>
+  </g>
+</svg>

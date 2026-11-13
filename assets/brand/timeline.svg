@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" role="img" aria-labelledby="t d">
+  <title id="t">OysterOS project timeline</title>
+  <desc id="d">6 October 2026: the mascot is drawn. 24 October: design package, 7 commits. 25 October: the big build and first boot on the real device, 27 commits. 26 October: going standalone, 14 commits. 27 October: scripting and the browser emulator, 5 commits. 13 November: public release 0.1.0 under the MIT licence.</desc>
+  <defs>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b1446"/>
+      <stop offset="0.55" stop-color="#121a33"/>
+      <stop offset="1" stop-color="#101923"/>
+    </linearGradient>
+    <linearGradient id="line" gradientUnits="userSpaceOnUse" x1="70" y1="150" x2="1130" y2="150">
+      <stop offset="0" stop-color="#B79CFF"/>
+      <stop offset="1" stop-color="#5EEAD4"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.12" cy="0" r="0.9">
+      <stop offset="0" stop-color="#8f6bff" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#8f6bff" stop-opacity="0"/>
+    </radialGradient>
+    <style>
+      .sans { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; }
+      .mono { font-family: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace; }
+      .kicker { font-size: 13px; letter-spacing: 3px; fill: #5EEAD4; font-weight: 600; }
+      .date { font-size: 15px; letter-spacing: 1px; fill: #5EEAD4; font-weight: 700; }
+      .head { font-size: 18.5px; fill: #EFE9FF; font-weight: 700; }
+      .body { font-size: 14.5px; fill: #B9B4DA; }
+      .chip { font-size: 12px; fill: #5EEAD4; font-weight: 600; }
+      .pulse { animation: pulse 2.4s ease-out infinite; transform-origin: 1090px 150px; }
+      @keyframes pulse { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(2.6); opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { .pulse { animation: none; opacity: 0; } }
+    </style>
+  </defs>
+
+  <rect x="1" y="1" width="1198" height="398" rx="22" fill="url(#card)" stroke="#2C2F5E" stroke-width="2"/>
+  <rect x="1" y="1" width="1198" height="398" rx="22" fill="url(#glow)"/>
+
+  <text x="48" y="56" class="mono kicker">PROJECT TIMELINE</text>
+  <text x="1152" y="56" text-anchor="end" class="mono kicker" fill-opacity="0.75">2026</text>
+
+  <line x1="70" y1="150" x2="1130" y2="150" stroke="url(#line)" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- 1 -->
+  <g text-anchor="middle">
+    <circle cx="110" cy="150" r="10" fill="#101923" stroke="#B79CFF" stroke-width="3"/>
+    <circle cx="110" cy="150" r="4" fill="#B79CFF"/>
+    <text x="110" y="118" class="mono date">06 OCT</text>
+    <text x="110" y="198" class="sans head">The mascot</text>
+    <text x="110" y="226" class="sans body">The oyster and its</text>
+    <text x="110" y="246" class="sans body">pearl are drawn.</text>
+  </g>
+
+  <!-- 2 -->
+  <g text-anchor="middle">
+    <circle cx="306" cy="150" r="10" fill="#101923" stroke="#A9A6F7" stroke-width="3"/>
+    <circle cx="306" cy="150" r="4" fill="#A9A6F7"/>
+    <text x="306" y="118" class="mono date">24 OCT</text>
+    <text x="306" y="198" class="sans head">Design package</text>
+    <text x="306" y="226" class="sans body">Vision, UI wireframes,</text>
+    <text x="306" y="246" class="sans body">design system and the</text>
+    <text x="306" y="266" class="sans body">engineering plan.</text>
+    <rect x="262" y="318" width="88" height="26" rx="13" fill="#5EEAD4" fill-opacity="0.10" stroke="#5EEAD4" stroke-opacity="0.45"/>
+    <text x="306" y="335.5" class="mono chip">7 commits</text>
+  </g>
+
+  <!-- 3 -->
+  <g text-anchor="middle">
+    <circle cx="502" cy="150" r="10" fill="#101923" stroke="#98B7EC" stroke-width="3"/>
+    <circle cx="502" cy="150" r="4" fill="#98B7EC"/>
+    <text x="502" y="118" class="mono date">25 OCT</text>
+    <text x="502" y="198" class="sans head">The big build</text>
+    <text x="502" y="226" class="sans body">Backend, AI agent loop,</text>
+    <text x="502" y="246" class="sans body">simulator, firmware core</text>
+    <text x="502" y="266" class="sans body">and UI. First boot on</text>
+    <text x="502" y="286" class="sans body">the real device.</text>
+    <rect x="455" y="318" width="94" height="26" rx="13" fill="#5EEAD4" fill-opacity="0.10" stroke="#5EEAD4" stroke-opacity="0.45"/>
+    <text x="502" y="335.5" class="mono chip">27 commits</text>
+  </g>
+
+  <!-- 4 -->
+  <g text-anchor="middle">
+    <circle cx="698" cy="150" r="10" fill="#101923" stroke="#86C9E2" stroke-width="3"/>
+    <circle cx="698" cy="150" r="4" fill="#86C9E2"/>
+    <text x="698" y="118" class="mono date">26 OCT</text>
+    <text x="698" y="198" class="sans head">Going standalone</text>
+    <text x="698" y="226" class="sans body">Status LED, voice, Wi-Fi</text>
+    <text x="698" y="246" class="sans body">join, on-device recon,</text>
+    <text x="698" y="266" class="sans body">AI over its own Wi-Fi.</text>
+    <rect x="651" y="318" width="94" height="26" rx="13" fill="#5EEAD4" fill-opacity="0.10" stroke="#5EEAD4" stroke-opacity="0.45"/>
+    <text x="698" y="335.5" class="mono chip">14 commits</text>
+  </g>
+
+  <!-- 5 -->
+  <g text-anchor="middle">
+    <circle cx="894" cy="150" r="10" fill="#101923" stroke="#72DADB" stroke-width="3"/>
+    <circle cx="894" cy="150" r="4" fill="#72DADB"/>
+    <text x="894" y="118" class="mono date">27 OCT</text>
+    <text x="894" y="198" class="sans head">Scripts and emulator</text>
+    <text x="894" y="226" class="sans body">Scratchpad, Python on</text>
+    <text x="894" y="246" class="sans body">the device, the firmware</text>
+    <text x="894" y="266" class="sans body">UI running in a browser.</text>
+    <rect x="850" y="318" width="88" height="26" rx="13" fill="#5EEAD4" fill-opacity="0.10" stroke="#5EEAD4" stroke-opacity="0.45"/>
+    <text x="894" y="335.5" class="mono chip">5 commits</text>
+  </g>
+
+  <!-- 6 -->
+  <g text-anchor="middle">
+    <circle class="pulse" cx="1090" cy="150" r="10" fill="none" stroke="#5EEAD4" stroke-width="2"/>
+    <circle cx="1090" cy="150" r="10" fill="#101923" stroke="#5EEAD4" stroke-width="3"/>
+    <circle cx="1090" cy="150" r="4" fill="#5EEAD4"/>
+    <text x="1090" y="118" class="mono date">13 NOV</text>
+    <text x="1090" y="198" class="sans head">Public release</text>
+    <text x="1090" y="226" class="sans body">Version 0.1.0, open</text>
+    <text x="1090" y="246" class="sans body">source under the</text>
+    <text x="1090" y="266" class="sans body">MIT licence.</text>
+    <rect x="1054" y="318" width="72" height="26" rx="13" fill="#B79CFF" fill-opacity="0.12" stroke="#B79CFF" stroke-opacity="0.55"/>
+    <text x="1090" y="335.5" class="mono chip" style="fill:#CDBBFF">v0.1.0</text>
+  </g>
+</svg>
