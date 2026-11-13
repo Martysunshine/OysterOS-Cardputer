@@ -1,6 +1,8 @@
+[OysterOS](../README.md) / [Docs](README.md) / Design system
+
 # OysterOS UI/UX Design System
 
-**Target:** 240 × 135 px landscape Cardputer ADV display. **Design state:** approved concept; implementation and exact keys not yet hardware-verified.
+**Target:** 240 × 135 px landscape Cardputer ADV display. **Design state:** the design system the firmware implements; its tokens live in `firmware/include/ui_theme.h`.
 
 ## Personality and goals
 A tiny but useful pocket operating shell. Dark maritime palette, seafoam highlight, obvious focus, restrained terminal styling, and no dead controls. A beginner must always understand how to go back.

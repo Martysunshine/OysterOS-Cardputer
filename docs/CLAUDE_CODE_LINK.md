@@ -1,18 +1,19 @@
+[OysterOS](../README.md) / [Docs](README.md) / Coding-assistant approvals
+
 # Claude Code link: yes/no approvals and a usage line on the Cardputer
 
 Lets the owner answer "may Claude Code run this tool?" (allow / deny) from the Cardputer, and see a simple
 usage line, without going back to the PC. Backend code: `backend/oyster/claude/`. PC-side scripts:
 `integrations/claude-code/`. Tests: `tests/claude/`. Setup in short: `integrations/claude-code/README.md`.
 
-## Status, stated plainly
+## Scope
 
-- **Backend and PC scripts only.** The Cardputer screens are not built yet (separate step); the contract they
-  will need is in "Contract for the firmware screens". Until then the device routes can be driven with `curl`
-  and a device token (see the README of the integration).
-- **Never run against a live Claude Code session.** The tests use a fake Claude Code input (JSON in the shape
-  the documentation specifies), a fake backend for the scripts, and the real app served by uvicorn on an
-  ephemeral loopback port for the end-to-end checks. What Claude Code does with the hook's output is taken from
-  its documentation and is **unverified** until the owner has tried it.
+- **Where the screens are.** On the Cardputer the approvals and the usage line are the "Claude Code" row of
+  the Control Deck module ([`CONTROL_DECK.md`](CONTROL_DECK.md), "Claude Code row"); the contract they use is
+  in "Contract for the firmware screens". The device routes can also be driven with `curl` and a device token
+  (see the README of the integration).
+- **Built from the documentation.** The input the hook reads and what Claude Code does with the hook's output
+  are taken from its documentation (see "Documentation relied on").
 - **Nothing is enforced here.** An "allow" from the device only tells Claude Code to skip its own prompt for
   that one call. Claude Code still evaluates its deny and ask rules afterwards (the documentation says a hook's
   allow does not override a matching deny rule). The link never adds permanent permission rules.
@@ -181,7 +182,7 @@ Decision: `POST …/decide` with `{"decision":"allow"|"deny","nonce":"…"}`. Re
 | 404 | "No longer there" |
 | 429 | wait `Retry-After` seconds |
 
-Interaction proposal, following the module framework's confirm pages: Enter approves, Back rejects, the UI
+Interaction, following the module framework's confirm pages: Enter approves, Back rejects, the UI
 ignores keys for the first 700 ms; an unanswered approval simply expires on the PC, so the device never needs a
 "cancel". Poll while the screen is open (the device already polls every few seconds; the list limit is 120
 requests a minute per device).
@@ -273,18 +274,16 @@ What this does **not** protect against:
 3. Merge `integrations/claude-code/settings.example.json` into your Claude Code settings with the absolute path
    filled in (details, matchers, environment variables, removal: `integrations/claude-code/README.md`).
 4. Start with `Bash` only and `OYSTER_WAIT_S=20`, run a command that prompts, answer it on the device (or with
-   `curl` until the screens exist), and watch `GET /v1/claude/audit` with the owner token.
+   `curl`), and watch `GET /v1/claude/audit` with the owner token.
 
-## Limits and unverified points
+## Limits
 
-| Point | State |
+| Point | Detail |
 | --- | --- |
-| Behaviour inside a real Claude Code session (output accepted, prompt falls back, allow honoured) | **unverified**; matches the documentation read on 2026-10-25 |
-| Whether the terminal dialog is visible while the hook waits | **unknown**: the documentation does not say. If it is only shown after the hook returns, an unanswered approval delays the dialog by `OYSTER_WAIT_S` |
-| Exec form (`args`) in the owner's Claude Code version | documented in the current hooks page; version needed is not stated. The README gives the shell form as fallback |
+| Terminal dialog while the hook waits | the documentation does not say whether it is visible meanwhile. If it is only shown after the hook returns, an unanswered approval delays the dialog by `OYSTER_WAIT_S` |
+| Exec form (`args`) | documented in the current hooks page; the version that introduced it is not stated. The README gives the shell form as fallback |
 | Parallel tool calls | each call runs its own hook process and gets its own approval; the device can hold up to 5 on screen and 8 waiting |
-| Cardputer screens for approvals and the usage line | not built |
-| Stopping `oyster serve` (Ctrl+C) while a hook waits | uvicorn lets an open request finish: measured 11.8 s of a 12 s wait. `app.state.claude.stop()` ends all waiting requests at once (measured 0.1 s) but `oyster serve` does not call it yet; a second Ctrl+C forces the exit, and pending approvals are ended at the next start either way |
+| Stopping `oyster serve` (Ctrl+C) while a hook waits | `oyster serve` ends all waiting requests when the stop signal arrives (`app.state.claude.stop()`), so it does not wait for their long poll; pending approvals are also ended at the next start |
 | Delay when the backend is not running | up to about 1 s per prompt on Windows (the script's connect timeout); on a stopped backend nothing else happens |
 | Status line cost on Windows | the script starts Python on each refresh; measure it before keeping it |
 | Secret redaction | best effort, see above |

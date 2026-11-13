@@ -1,3 +1,5 @@
+[OysterOS](../README.md) / [Docs](README.md) / Voice questions
+
 # Voice questions (push-to-talk)
 
 On the Oyster AI screen the owner can **speak** a question instead of typing it. The Cardputer ADV records
@@ -9,17 +11,17 @@ Code: `firmware/include/voice_capture.h`, `firmware/src/voice_capture.cpp`, the 
 `firmware/lib/oyster_core/{include/oyster_core/voice_codec.h,src/voice_codec.cpp}` (device); the backend
 package `backend/oyster/voice/`. Tests: `firmware/test/test_voice/`, `tests/voice/`.
 
-## Status, stated plainly
+## Design notes
 
-- **The microphone has not been exercised on a real Cardputer ADV in this build.** M5Unified 0.2.27 drives
-  the ADV microphone through the ES8311 codec on I2S, and this code initialises it the way the library's own
-  board table expects, but no audio has been captured on hardware. If `M5.Mic.begin()` fails on the device,
-  the screen says "Microphone did not start" — it never fakes a recording.
-- **The streamed upload timing has not been measured on hardware.** The ring is sized for about one second;
-  if the uplink falls behind, whole audio blocks are dropped and the screen shows `gaps!`.
-- **Transcription has not been run against the real provider.** The backend is tested only against a fake
-  speech endpoint (`httpx.MockTransport`). The request shape follows the provider's OpenAI-compatible audio
-  API; the model (`whisper-large-v3-turbo`) is on the account's list but has not been called from here.
+- **Voice needs the backend.** The device records and uploads; transcription happens on the PC backend. With
+  the backend unreachable, "Speak a question" is refused with a message.
+- **Microphone.** M5Unified 0.2.27 drives the ADV microphone through the ES8311 codec on I2S, and this code
+  initialises it the way the library's own board table expects. If `M5.Mic.begin()` fails on the device, the
+  screen says "Microphone did not start" — it never fakes a recording.
+- **Streamed upload.** The ring is sized for about one second; if the uplink falls behind, whole audio blocks
+  are dropped and the screen shows `gaps!`.
+- **Transcription.** The request shape follows the provider's OpenAI-compatible audio API; the default speech
+  model is `whisper-large-v3-turbo`.
 
 ## How it works
 
@@ -49,7 +51,7 @@ package `backend/oyster/voice/`. Tests: `firmware/test/test_voice/`, `tests/voic
 - The provider receives the audio and returns text. Treat anything you say as disclosed to that provider,
   exactly like a typed question. See [PRIVACY.md](PRIVACY.md).
 - `AI_API_KEY` is sent only in the `Authorization` header and is scrubbed from every error message; it is
-  never logged and never reaches the device.
+  never logged, and the voice routes never send it to the device.
 
 ## Formats and limits
 
@@ -76,9 +78,9 @@ package `backend/oyster/voice/`. Tests: `firmware/test/test_voice/`, `tests/voic
 | `not_found` | "upload expired or unknown, try again" |
 | transport failure | "backend offline" |
 
-## How to disable
+## Settings
 
-Leave `AI_API_KEY` empty, or set `AI_SPEECH_MODEL=` (empty) in `backend/.env`. "Speak a question" then fails
-cleanly with `transcription_unavailable` and the screen says voice input is not set up. Typing a question
-still works regardless. `AI_SPEECH_LANGUAGE` is an optional ISO-639-1 hint; empty lets the provider detect
-the language.
+Voice input uses the `AI_API_KEY` of the AI runs (`backend/.env`). With the key empty, "Speak a question"
+fails cleanly with `transcription_unavailable` and the screen says voice input is not set up.
+`AI_SPEECH_MODEL` selects the speech model (default `whisper-large-v3-turbo`). `AI_SPEECH_LANGUAGE` is an
+optional ISO-639-1 hint; empty lets the provider detect the language.

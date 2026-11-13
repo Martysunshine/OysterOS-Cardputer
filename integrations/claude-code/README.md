@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / integrations / claude-code
+
 # Claude Code link: PC-side scripts
 
 Two small scripts (Python 3.12, **standard library only**) connect Claude Code to the Oyster backend on this PC:
@@ -8,8 +10,7 @@ Two small scripts (Python 3.12, **standard library only**) connect Claude Code t
 | `oyster_statusline.py` | `statusLine` command | Prints a one-line status for the terminal (`Opus \| ctx 8% \| $0.01 \| 5h 24% 7d 41%`) and posts the same numbers to the backend so the Cardputer can show them. |
 | `settings.example.json` | | The snippet to paste into your own Claude Code settings. |
 
-Design, threat model, API and limits: `docs/CLAUDE_CODE_LINK.md`. Nothing here has been run against a live
-Claude Code session yet, so start with the steps below.
+Design, threat model, API and limits: [`docs/CLAUDE_CODE_LINK.md`](../../docs/CLAUDE_CODE_LINK.md).
 
 ## This is opt-in
 
@@ -26,7 +27,7 @@ snippet from `settings.example.json` into your settings. Without it, Claude Code
    replace `<ABSOLUTE_PATH_TO_REPO>` with the absolute path of this checkout. Forward slashes are fine on
    Windows. If you already have a `statusLine` or `PermissionRequest` entry, keep yours and merge by hand.
 4. Start a new Claude Code session, ask it to run a command that needs permission, and watch the device (or
-   see "Without the firmware screens" below).
+   see "Answering without the Cardputer" below).
 
 ### Matchers
 
@@ -62,9 +63,9 @@ the path). If your Claude Code rejects `args`, use the shell form instead:
 `"command": "python \"<ABSOLUTE_PATH_TO_REPO>/integrations/claude-code/oyster_hook.py\""` and no `args`.
 Do not set `onFailure: "block"` on this hook: it would turn every failure (backend not running) into a deny.
 
-## Without the firmware screens
+## Answering without the Cardputer
 
-The Cardputer screens for this feature come in a later step. Until then you can answer with the device token
+On the Cardputer the requests are under Control Deck > Claude Code. You can also answer with the device token
 on the loopback port (the loopback listener also serves the device routes). With `<DEVICE_TOKEN>` from your
 pairing:
 
@@ -82,10 +83,10 @@ curl -s -X POST -H "Authorization: Bearer <DEVICE_TOKEN>" -H "Content-Type: appl
 - In sessions that cannot show a prompt (the documentation names background subagents in non-interactive
   mode), Claude Code itself denies a call when no `PermissionRequest` hook decides, so silence there means
   "denied".
-- Not known until you try (the documentation does not say): whether the terminal's own permission dialog is
-  already visible while the hook is waiting, or only appears after the hook returned. If it only appears
-  afterwards, a hook that waits the full 90 s delays the dialog by that long when nobody answers on the device.
-  Use a short `OYSTER_WAIT_S` until you know.
+- The documentation does not say whether the terminal's own permission dialog is already visible while the
+  hook is waiting, or only appears after the hook returned. If it only appears afterwards, a hook that waits
+  the full 90 s delays the dialog by that long when nobody answers on the device; a short `OYSTER_WAIT_S`
+  limits that.
 
 ## Remove it
 

@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-005
+
 # ADR-005: Local confirmation gate
 
 **Status:** accepted (2026-10-24)

@@ -1,10 +1,13 @@
+[OysterOS](../README.md) / [Docs](README.md) / Architecture
+
 # Architecture
 
 This describes the design of Oyster Pocket as given by the ADRs and the interface definitions (`schemas/`,
-`docs/API.md`, `docs/PROVISIONING.md`, firmware headers). It describes the design, not proof that it works.
-What is implemented and verified is in [`CAPABILITY_MATRIX.md`](CAPABILITY_MATRIX.md). How these parts relate to
-the OysterOS design package (Linux Console, Control Deck, Smart Home and Original Apps are not part of them) is in
-[`INTEGRATION.md`](INTEGRATION.md).
+`docs/API.md`, `docs/PROVISIONING.md`, firmware headers). The checks to run on a real device are in
+[`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md). The Control Deck, Smart Home, voice, web access and
+scripting features have their own pages: [`CONTROL_DECK.md`](CONTROL_DECK.md),
+[`HOME_ASSISTANT.md`](HOME_ASSISTANT.md), [`VOICE_INPUT.md`](VOICE_INPUT.md),
+[`WEB_ACCESS.md`](WEB_ACCESS.md) and [`SCRIPTS.md`](SCRIPTS.md).
 
 ## 1. Components
 
@@ -12,8 +15,8 @@ the OysterOS design package (Linux Console, Control Deck, Smart Home and Origina
                       2.4 GHz Wi-Fi LAN                                   Internet
   +------------------+   HTTPS :8443 (dev-CA TLS,   +---------------------+   HTTPS    +-----------+
   |  Cardputer ADV   |   device bearer token)       |  Backend (FastAPI)  | ---------> | Groq API  |
-  |  firmware        | ---------------------------> |  SQLite + files     |  AI key    | (model)   |
-  |  UI, radios, SD  |   device polls; no inbound   |  AI orchestrator    |  only here +-----------+
+  |  firmware        | ---------------------------> |  SQLite + files     |  AI key in | (model)   |
+  |  UI, radios, SD  |   device polls; no inbound   |  AI orchestrator    |  .env      +-----------+
   +------------------+   port on the device         +---------------------+
      |   ^      |                                       ^ HTTP 127.0.0.1:8000 (admin token / sim token)
  BLE |   | adv  | SPI                                   |
@@ -36,11 +39,16 @@ the OysterOS design package (Linux Console, Control Deck, Smart Home and Origina
 The backend does not need to be next to the Cardputer, only reachable on the network. Live BLE work
 needs the Cardputer within radio range of the target.
 
+The diagram shows the backend route. When the backend is not reachable, the firmware's direct-AI client
+(`src/direct_ai.cpp`) can send a typed question straight to the provider over the device's own Wi-Fi, using a
+provider key stored in NVS at provisioning ([`PROVISIONING.md`](PROVISIONING.md)). That mode is plain
+question and answer: no tools and no evidence.
+
 ## 2. Execution modes
 
 | Mode | Radio | AI | Label |
 | --- | --- | --- | --- |
-| Live | real operations on the Cardputer | when the backend is reachable | `LIVE RADIO` / `BACKEND OK` / `AI CONNECTED` |
+| Live | real operations on the Cardputer | when the backend is reachable; direct question and answer otherwise | `LIVE RADIO` / `BACKEND OK` / `AI CONNECTED` / `ONLINE` |
 | Offline | real local operations, evidence queued on SD | explicitly unavailable, never invented | `OFFLINE` |
 | Simulation | none; simulator fixtures | real model allowed (M1 demo) or fake provider in tests | `SIMULATED` (simulator events and exports) |
 
@@ -52,7 +60,8 @@ The Cardputer's mode banner shows the first value that applies:
 3. `AI CONNECTED`: only while the latest AI run actually used a provider (status `running`,
    `awaiting_device`, `awaiting_local_confirmation`, `succeeded` or `budget_exhausted`).
 4. `BACKEND OK`: the backend is reachable and the device is authenticated.
-5. `OFFLINE`.
+5. `ONLINE`: Wi-Fi is connected but the backend is not reachable.
+6. `OFFLINE`.
 
 `SIMULATED` is never shown for firmware data. The simulated label is carried in every simulator event
 (`source_mode`), every finding built from one, and every export. A finding is `simulated` if any of its
@@ -118,7 +127,8 @@ The UI aims to acknowledge a cancel within 1 s; actual radio-stop latency is mea
   `app_auth` (reading it replaces the fixture's single outstanding challenge). Anything else is refused
   before the radio is used and recorded as `denied`. Reads chosen on the device itself are not restricted.
 - Protected access happens only through the access-policy assertions, gated by local confirmation when the
-  assertion writes or transfers. The device side of those is M4.
+  assertion writes or transfers. The Cardputer firmware answers a job for them as `unsupported`; they run on
+  the simulation route.
 - Job limits (`max_results`, `max_duration_s`, `max_bytes`, and the job deadline) are enforced on the
   device and recorded in a `job_limits` object in the summary event (limits received, plus `applied`:
   the ones that changed the result). A hit makes the result `Partial` with `complete: false`.
@@ -137,16 +147,16 @@ The image is a full-flash build with its own partition table and no OTA slot
 | `coredump` | data | `0x7F0000` | `0x10000` |
 
 Uploading it replaces the partition table and the application, so the M5Stack factory firmware, the launcher and
-the original apps can no longer start. Nothing in this repository starts them again; there is no launcher
-integration. The safety net is a copy of the whole flash: `scripts/firmware-backup.ps1` reads `0x0..0x800000` with
-the esptool bundled in PlatformIO, and `scripts/firmware-flash.ps1` refuses to upload to a chip without a verified
-copy. Restore route: [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md#restoring-your-own-backup-esptool). A build that
-runs as an app inside the existing launcher would need a different partition layout and loading mechanism; it is
-not built ([`INTEGRATION.md`](INTEGRATION.md)).
+the original apps can no longer start, and the firmware cannot start them from the device
+([ADR-009](adr/ADR-009-dual-boot-original-firmware.md)). The safety net is a copy of the whole flash:
+`scripts/firmware-backup.ps1` reads `0x0..0x800000` with the esptool bundled in PlatformIO, and
+`scripts/firmware-flash.ps1` refuses to upload to a chip without a verified copy. Restore route:
+`scripts/original-restore.ps1` ([`DUAL_BOOT.md`](DUAL_BOOT.md)) or
+[`TROUBLESHOOTING.md`](TROUBLESHOOTING.md#restoring-your-own-backup-esptool).
 
 ### Resource limits (`oyster_core/config.h`)
 
-These are engineering defaults to measure and tune. They are not demonstrated performance.
+These are the engineering defaults.
 
 | Limit | Value |
 | --- | --- |
@@ -165,22 +175,20 @@ No PSRAM is assumed (ESP32-S3FN8). The UI paints every region through one reside
 (7,680 B of internal RAM), not a full-screen framebuffer; the boot splash is drawn once, band by band. If the
 sprite cannot be allocated, screen output is switched off and the rest keeps running.
 
-### Keyboard (proposed; must be confirmed on hardware)
-
-All bindings are **proposed and UNVERIFIED**.
+### Keyboard
 
 | Action | Keys |
 | --- | --- |
 | Emergency cancel (any screen) | `Fn+`` ` `` (reported by the library as fn+esc; this keyboard has no plain Esc key) or `Ctrl+C` |
 | Navigate | arrow legends `;` up, `.` down, `,` left, `/` right (bare in menus, with `Fn` in text entry) |
 | Select / Back | `Enter` / `` ` `` or `Del` (navigation mode) |
-| Home | `Fn`+`Del` (press `Fn` first), any mode; the design plan allows it only once validated |
+| Home | `Fn`+`Del` (press `Fn` first), any mode |
 | Help | `?` (`Shift`+`/`), navigation mode |
-| Home shortcuts | `1`-`8` open the tiles (Help is tile 8, a visible fallback for the unverified `?`) |
+| Home shortcuts | `1`-`9` open the tiles (Help is also tile 8) |
 | Text entry | printable keys type, `Del` erases (and leaves when empty), `Enter` confirms |
 
 Settings > Key tester shows the physical keys of the last key change and the action they resolve to. The
-confirmed mapping goes in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) (HV-03).
+device check for the mapping is HV-03 in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
 
 ## 4. Backend
 
@@ -256,7 +264,7 @@ provider, and BSSIDs/BLE addresses are masked by default. What the provider rece
 | Clock | serial seed at provisioning (applied at `DONE`), then SNTP, then `/v1/time` hint; `clock_quality` on every event. Without a plausible clock the firmware sends no authenticated request (`ClockNotSet`, a firmware policy) |
 | Targets | only targets enrolled locally over USB; the backend cannot add targets to the device remotely. A connected peer must pass the `device_info` identity check before anything else is read |
 | AI provider | redacted, bounded evidence; identifiers masked by default; see [`PRIVACY.md`](PRIVACY.md) |
-| Secrets | AI key only in `backend/.env`; device token/Wi-Fi password/CA never echoed, logged, or written to SD |
+| Secrets | AI key in `backend/.env` and, for direct mode, in the device's NVS; AI key/device token/Wi-Fi password/CA never echoed, logged, or written to SD |
 
 The device credentials are development credentials in flash. They are not tamper-proof storage.
 
@@ -268,8 +276,8 @@ The device credentials are development credentials in flash. They are not tamper
 - Findings: `schemas/finding.schema.json` with classification `observation`, `candidate`, `confirmed`,
   `passed`, `inconclusive` or `unsupported`.
 - SD layout: `/oyster/sessions/<session-id>/events.jsonl`, `manifest.json`, `wifi.csv`,
-  `artifacts/<object-id>.bin` (`.partial` while streaming). Recovery tolerates a truncated last JSONL line.
-  FAT is not power-loss atomic, so this has to be tested on the device.
+  `artifacts/<object-id>.bin` (`.partial` while streaming). Recovery tolerates a truncated last JSONL line;
+  FAT is not power-loss atomic.
 - Without an SD card, a session's events live only in the 8 KiB RAM ring and are lost on reboot.
 - Upload state on the Saved Findings screen (Security > Saved Findings):
   - Skipped (refused by backend): N. Kept on the SD card; NOT acknowledged. Not counted as accepted.
@@ -279,7 +287,7 @@ The device credentials are development credentials in flash. They are not tamper
   uploaded by this firmware. They stay on the SD card in `/oyster/sessions/<session-id>/events.jsonl`. At
   boot the newest earlier session is scanned and repaired (a truncated last line is terminated), and a
   recovery event in the new session records its id, valid and invalid line counts and the unacked range
-  with `sync_status` `not_uploaded_milestone_m6`. Uploading earlier sessions is milestone M6.
+  with `sync_status` `not_uploaded_milestone_m6`.
 - `wifi.csv` columns `survey_started_ms` (device uptime), `exported_at_utc` and `export_clock_quality`
   describe when rows were written, not when each AP was observed. The Wi-Fi summary event field
   `observed_ap_country` is a neighbour AP's advertised country, NOT this device's regulatory domain.

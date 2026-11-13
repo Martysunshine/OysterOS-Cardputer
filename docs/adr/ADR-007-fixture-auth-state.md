@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-007
+
 # ADR-007: Fixture authorization state and capability limits
 
 **Status:** accepted (2026-10-24)
@@ -12,5 +14,5 @@ support depends on your Bluetooth adapter and driver, so `oyster-fixture check` 
 `is_peripheral_role_supported` for the adapter in use. On a host where it is `True`, WinRT exposes
 `GattProtectionLevel.ENCRYPTION_REQUIRED` **and** `ENCRYPTION_AND_AUTHENTICATION_REQUIRED`, so both a
 link-encryption-required and an authenticated-pairing-required characteristic can be published. Where a
-host/library cannot reproduce a pairing state, that assertion is marked unsupported in
-`docs/CAPABILITY_MATRIX.md` rather than reported as a pass.
+host/library cannot reproduce a pairing state, that assertion is marked unsupported rather than reported
+as a pass.

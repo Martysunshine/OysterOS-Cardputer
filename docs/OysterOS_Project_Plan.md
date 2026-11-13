@@ -1,6 +1,8 @@
+[OysterOS](../README.md) / [Docs](README.md) / Project plan
+
 # OysterOS Engineering Plan — v0.3
 
-**Status:** specification; implementation not started. **Target:** M5Stack Cardputer ADV. **Priority:** preserve installed applications and existing launcher.
+**Status:** design record. This is the original product and engineering plan, written before implementation; the system as built is described in [`ARCHITECTURE.md`](ARCHITECTURE.md) and the [README](../README.md). **Target:** M5Stack Cardputer ADV. **Priority:** preserve installed applications and existing launcher.
 
 ## 0. Non-negotiable constraints
 
@@ -127,7 +129,7 @@ Scheduled trigger → authorization/allowlist validation → job queue → step 
 
 ## 7. Repository layout (target, not implemented)
 ```text
-Cardputer-OysterOS/
+OysterOS/
 ├── README.md
 ├── docs/
 │   ├── OysterOS_Project_Plan.md
@@ -368,7 +370,6 @@ Build this as a **monorepo** with separately testable packages:
   docs/
     OysterOS_Project_Plan.md
     DESIGN_SYSTEM.md
-    DEVELOPMENT_ROADMAP.md
     HARDWARE_AUDIT_TEMPLATE.md
   simulator/
     README.md

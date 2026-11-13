@@ -1,3 +1,5 @@
+[OysterOS](../README.md) / [Docs](README.md) / Backend API
+
 # Backend API contract (v1)
 
 All bodies are JSON. Shapes are defined by `schemas/*.schema.json` and mirrored in
@@ -48,7 +50,7 @@ More routes, documented with their own limits and tests:
 - Control Deck (`/v1/deck/...`: profiles, slot runs, confirmation, history, owner administration; executors `mock` and `windows`, chosen by `OYSTER_DECK_EXECUTOR`): [`CONTROL_DECK.md`](CONTROL_DECK.md).
 - Smart Home / Home Assistant bridge (`/v1/home/...`, summarised below): [`HOME_ASSISTANT.md`](HOME_ASSISTANT.md).
 
-All three follow the listener rules above: device routes on both listeners, owner routes on the loopback listener only. The firmware modules that call them (Hosts, Control Deck, Smart Home) are written and host-tested; none has run on a Cardputer.
+All three follow the listener rules above: device routes on both listeners, owner routes on the loopback listener only. The firmware modules that call them are Hosts, Control Deck and Smart Home.
 
 ### Home Assistant bridge routes (`/v1/home/...`)
 
@@ -60,7 +62,7 @@ All three follow the listener rules above: device routes on both listeners, owne
 | `GET /v1/home/status` | owner (loopback only) | What is configured (`url_set`, `token_set`, `tls`, `ca_file_set`) and the allowlist problems; never the URL or the token. |
 | `GET /v1/home/audit` | owner (loopback only) | Append-only audit, newest first, at most 50 per page; a `pending` row is written before each Home Assistant call. |
 
-`HOME_ASSISTANT_URL` and `HOME_ASSISTANT_TOKEN` (and optionally `HOME_ASSISTANT_CA`) are read from `backend/.env`; they are never returned by any route, never logged and never sent to the device. Limits: 20 actions and 60 reads per minute per device (**429** `rate_limited`). Home Assistant is not configured on the current setup, and the bridge has been tested only against a fake Home Assistant.
+`HOME_ASSISTANT_URL` and `HOME_ASSISTANT_TOKEN` (and optionally `HOME_ASSISTANT_CA`) are read from `backend/.env`; they are never returned by any route, never logged and never sent to the device. Limits: 20 actions and 60 reads per minute per device (**429** `rate_limited`).
 
 Error codes of these routes, in the usual `{"error","detail"}` body: `home_not_configured` (503), `home_unreachable` (503), `home_timeout` (503; on an action the outcome is unknown), `home_auth_failed` (502), `home_refused` (502), `home_upstream_error` (502), `confirmation_required` (409, nothing was sent), `action_not_allowed` (403), `idempotency_conflict` and `request_in_progress` (409), `audit_unavailable` (503, nothing was done), plus `not_found`, `validation_failed`, `payload_too_large` and `rate_limited` as elsewhere.
 

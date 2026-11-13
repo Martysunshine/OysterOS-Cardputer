@@ -1,9 +1,10 @@
+[OysterOS](../README.md) / [Docs](README.md) / Pocket core
+
 # Oyster Pocket: implementation overview
 
 This page describes the working code in this repository: the firmware, backend and lab tools that
-implement the Security and Oyster AI modules of OysterOS. The product vision is in the root
-[`README.md`](../README.md); how the vision and this implementation fit together is in
-[`INTEGRATION.md`](INTEGRATION.md).
+implement the Security and Oyster AI modules of OysterOS. The product overview is in the root
+[`README.md`](../README.md); how the parts fit together is in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 Oyster Pocket is a handheld wireless assessment instrument built on **one M5Stack Cardputer ADV**
 (ESP32-S3), with an AI backend on your own PC.
@@ -16,15 +17,11 @@ Oyster Pocket is a handheld wireless assessment instrument built on **one M5Stac
 - Stores evidence (on the microSD card and in the backend), and uses a real AI model (Groq, through
   an OpenAI-compatible API) to plan supported checks and explain the results with evidence references.
 
-> **Status: in progress. Nothing has been verified on a Cardputer yet.** The firmware is compiled and
-> tested on a PC; no device has been attached. Every hardware step in these docs is marked
-> *manual step - unverified until run*. What exists and what does not:
-> [`CAPABILITY_MATRIX.md`](CAPABILITY_MATRIX.md).
-
 > **The firmware is a full-flash image.** Flashing it replaces the M5Stack factory firmware, the launcher
 > and the original apps (custom partition table, no OTA). Back the device up first with
 > `.\scripts\firmware-backup.ps1`; `.\scripts\firmware-flash.ps1` refuses to flash a chip without a verified
-> backup. See [`SETUP_WINDOWS.md`](SETUP_WINDOWS.md) step 0 and [`INTEGRATION.md`](INTEGRATION.md).
+> backup. See [`SETUP_WINDOWS.md`](SETUP_WINDOWS.md) step 0; restoring the original firmware is described in
+> [`DUAL_BOOT.md`](DUAL_BOOT.md).
 
 ## What it does not do
 
@@ -49,14 +46,12 @@ A second Cardputer is never needed.
 
 ## Capabilities at a glance
 
-The full, honest version is [`CAPABILITY_MATRIX.md`](CAPABILITY_MATRIX.md).
-
 | Area | Simulation route (PC only) | Real Cardputer firmware |
 | --- | --- | --- |
-| AI planning + explanation (real model) | in scope for M1 (real model, explicitly simulated results); the lab demo has run end to end against a real Groq model | relays questions; written, unverified on hardware |
-| Wi-Fi survey | simulated results | written, unverified on hardware |
-| BLE discovery, GATT inspection, profile reads | simulated results | written, unverified on hardware |
-| Access-policy checks, reversible write, diagnostic transfer | simulated results | **not built yet (M4)**: the device answers `unsupported` |
+| AI planning + explanation (real model) | real model, explicitly simulated results (`demo-m1.ps1`) | relays questions to the backend and shows the answer |
+| Wi-Fi survey | simulated results | live radio (2.4 GHz) |
+| BLE discovery, GATT inspection, profile reads | simulated results | live radio (inspection and reads on enrolled targets only) |
+| Access-policy checks, reversible write, diagnostic transfer | simulated results | the device answers `unsupported`; these run on the simulation route only |
 | Report export | backend | backend |
 
 "Simulated" results check orchestration, policy evaluation and reporting. They say nothing about radios,
@@ -71,15 +66,18 @@ a tile is its shortcut key on the Home screen:
 | Tile | Opens |
 | --- | --- |
 | 1 Security | Wi-Fi Survey, Bluetooth Explorer, Saved Findings, Enrolled Targets, Assess |
-| 2 Oyster AI | Ask a question, Latest AI run, Cancel AI run, Sync evidence now |
-| 3 Linux (Hosts), 4 Control Deck, 5 Smart Home, 6 Original Apps | module pages written, unverified on the device: read-only host health, allowlisted PC actions with local confirmation, IR remote and Home Assistant, and booting the original firmware in the dual-boot build (the default build shows "not set up") |
-| 7 Settings | Backend, Brightness, Storage, Diagnostics, Sync, New session, Keyboard, Key tester, About |
+| 2 Oyster AI | Ask a question, Speak a question, Latest AI run, Cancel AI run, Sync evidence now |
+| 3 Red Team | on-device Python scripts ([`SCRIPTS.md`](SCRIPTS.md)) |
+| 4 Control | allowlisted PC actions with local confirmation ([`CONTROL_DECK.md`](CONTROL_DECK.md)) |
+| 5 Smart Home | IR remote and Home Assistant ([`HOME_ASSISTANT.md`](HOME_ASSISTANT.md)) |
+| 6 Original | what is stored of the original firmware and how to restore it from the PC ([`DUAL_BOOT.md`](DUAL_BOOT.md)) |
+| 7 Settings | Wi-Fi, Backend, Brightness, Storage, Diagnostics, Sync, New session, Keyboard, Key tester, About |
 | 8 Help | the key bindings and a hint for the screen it was opened from |
+| 9 Scratchpad | offline calculator and notepad |
 
 The mapping from the design's screen identifiers to firmware screens is in
-[`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md). Every key binding, including Home (`Fn`+`Del`) and Help (`?`), is
-proposed and **unverified**; **Settings > Key tester** shows what a key press resolves to. Nothing about the
-look has been seen on a real display yet.
+[`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md), with the key bindings (Home is `Fn`+`Del`, Help is `?`);
+**Settings > Key tester** shows what a key press resolves to.
 
 ## Quick start (Windows, PowerShell)
 
@@ -100,7 +98,7 @@ repository root:
 # 4. M1 demo: real AI model + simulated device + exported report (needs AI_API_KEY and AI_MODEL)
 .\scripts\demo-m1.ps1
 
-# 5. Firmware (build needs no device; backup/flash/monitor/provision are manual steps - unverified until run)
+# 5. Firmware (build needs no device; backup, flash, monitor and provision need the Cardputer on USB)
 .\scripts\firmware-build.ps1
 .\scripts\firmware-backup.ps1 -Port COM5      # whole 8 MB flash -> _backups\<mac>\<stamp>\; do this BEFORE the first flash
 .\scripts\firmware-flash.ps1 -Port COM5       # refuses without a verified backup of that chip
@@ -115,30 +113,6 @@ repository root:
 If PowerShell refuses to run scripts, run this once in the same window:
 `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`.
 
-### Verification status
-
-Tested so far:
-
-- The automated checks of `scripts\check.ps1` (pytest, ruff, schema validation) and the firmware host tests
-  (`pio test -e native`).
-- The firmware build (`firmware-build.ps1`): compile and link, with size and SHA-256 printed. This is not a
-  hardware result.
-- Parsing of all `scripts\*.ps1` in PowerShell 7 and Windows PowerShell 5.1.
-- The backend and `oyster-sim` against a fake AI provider (wiring test, simulated data only).
-- The backup and flash-gate flow of `firmware-backup.ps1` and `firmware-flash.ps1` (backup folder, hash file,
-  JSON, refusal without or with a damaged backup, `-DryRun`), against a stand-in script that imitates esptool's
-  output.
-
-Not done yet:
-
-- Anything on hardware. No Cardputer has been attached: `firmware-backup.ps1`, `firmware-flash.ps1`,
-  `firmware-monitor.ps1` and `provision.ps1` have not run against a device.
-- The AI with the Cardputer. `demo-m1.ps1` has run against a real Groq model, but with a simulated device.
-- The live BLE fixture against a device. `fixture.ps1 check` is read-only and reports what your Bluetooth
-  adapter supports; run it on your machine.
-
-Record hardware results in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
-
 ## Execution modes
 
 The handheld's status bar always shows one mode banner, and every event and export carries
@@ -152,6 +126,8 @@ Banner on the Cardputer (the first one that applies is shown):
 - **AI CONNECTED**: the latest AI run actually used a provider (status `running`, `awaiting_*`,
   `succeeded` or `budget_exhausted`). A reachable backend alone does not show this.
 - **BACKEND OK**: the backend is reachable and the device is authenticated.
+- **ONLINE**: Wi-Fi is connected but the backend is not reachable. With a provider key stored on the device,
+  Oyster AI still answers a typed question directly (question and answer only).
 - **OFFLINE**: none of the above. The device still surveys and stores evidence. The AI says it is
   unavailable rather than inventing an answer.
 
@@ -171,32 +147,30 @@ and report built from it.
 | `examples/` | Sanitized, clearly labelled simulated sessions and sample report |
 | `scripts/` | Windows PowerShell scripts listed above, plus `make_ca_bundle.py`, `gen_lab_profile_header.py` and `gen_assets.py` (converts the art in `assets/` for the firmware) |
 | `assets/` | Art for the device UI (the mascot, icons, boot splash and loader) and the README banner; all but the mascot is AI-generated; see [`PROVENANCE.md`](../assets/PROVENANCE.md) |
-| `docs/` | Design package (plan, design system, roadmap, audit template) and the implementation docs: integration, UI screen map, setup, architecture, BLE profile, capability matrix, hardware checklist, troubleshooting, build matrix |
+| `docs/` | Design package (plan, design system, audit template) and the implementation docs: UI screen map, setup, architecture, BLE profile, hardware checklist, troubleshooting, build matrix |
 | `_backups/` | Created locally by `firmware-backup.ps1` (flash dumps of your device). Not part of the repository; never commit or share it |
 
 ## Documentation
 
 | Document | Use it for |
 | --- | --- |
-| [`INTEGRATION.md`](INTEGRATION.md) | How the OysterOS design package and this implementation fit together |
 | [`SETUP_WINDOWS.md`](SETUP_WINDOWS.md) | Step-by-step setup, backup, flashing, provisioning, demo, recovery |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | How the parts fit together |
-| [`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md) | The design's screen identifiers mapped to firmware screens, with navigation tree and proposed keys |
+| [`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md) | The design's screen identifiers mapped to firmware screens, with navigation tree and keys |
 | [`BLE_LAB_PROFILE.md`](BLE_LAB_PROFILE.md) | Lab GATT profile: UUIDs, policies, assertions, transfer and app-auth protocols |
-| [`CAPABILITY_MATRIX.md`](CAPABILITY_MATRIX.md) | What works where, and what does not exist yet |
 | [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) | Your checklist for the real device, with a results table |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Certificates, COM ports, download mode, restoring a backup, firewall, Bluetooth |
 | [`PRIVACY.md`](PRIVACY.md) | What the AI provider receives, what is masked, what is never sent |
 | [`BUILD_MATRIX.md`](BUILD_MATRIX.md) | Exact pinned toolchain and library versions, partition table |
 | [`API.md`](API.md), [`PROVISIONING.md`](PROVISIONING.md) | HTTP API and serial provisioning contracts |
 | [`adr/`](adr/) | Architecture decisions |
-| [`CI_SUGGESTION.md`](CI_SUGGESTION.md) | What a CI pipeline would run. **CI is not configured yet.** |
 
 ## Secrets
 
 `backend\.env` (AI key, admin token, fixture credential), device tokens, Wi-Fi passwords, raw surveys
-SD dumps and flash backups must never be committed (see [`CONTRIBUTING.md`](../CONTRIBUTING.md)). The AI key lives only on the backend; it is
-never sent to the Cardputer, written to the SD card, or logged.
+SD dumps and flash backups must never be committed (see [`CONTRIBUTING.md`](../CONTRIBUTING.md)). The AI key
+lives in `backend\.env` and, for direct mode, in the Cardputer's internal NVS storage; it is never written to
+the SD card or logged.
 
 The owner/admin API is served only on the loopback listener (`127.0.0.1:8000`). The LAN HTTPS listener
 serves device routes only and answers 403 to the owner token. `oyster serve` refuses an
@@ -205,7 +179,8 @@ serves device routes only and answers 403 to the owner token. `oyster serve` ref
 What the AI provider receives (SSIDs are sent unmasked; BSSIDs and BLE addresses are masked by default):
 [`PRIVACY.md`](PRIVACY.md).
 
-## License
+## Licence
 
-See [`LICENSE-NOTICES.md`](../LICENSE-NOTICES.md). The license for the original code has not been chosen yet.
-Contribution rules: [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+The original code is under the MIT licence, see the root [`LICENSE`](../LICENSE); third-party components are
+listed in [`THIRD-PARTY-NOTICES.md`](../THIRD-PARTY-NOTICES.md). Contribution rules:
+[`CONTRIBUTING.md`](../CONTRIBUTING.md).

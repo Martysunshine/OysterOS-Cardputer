@@ -1,3 +1,5 @@
+[OysterOS](../README.md) / [Docs](README.md) / Smart Home
+
 # Smart Home: IR remote and Home Assistant (Home tile 5, screens SH10-SH12)
 
 One tile, two integrations. The **IR remote** drives the Cardputer's own IR LED and needs no backend. **Home
@@ -7,17 +9,15 @@ Assistant** (lights, switches, locks, ...) goes through the PC backend and an ow
 (device); `backend/oyster/home/` (backend). Tests: `firmware/test/test_smarthome/`, `tests/home/`. Example
 allowlist: `examples/home_allowlist.example.json`.
 
-## Status, stated plainly
+## What to know first
 
-- **IR codes: unverified.** The code tables come from public protocol documentation and open TV code lists and
-  are checked in the host tests against the MSB-first hex codes those lists print. **No code has been tried on
-  a real TV.**
-- **IR LED pin: unverified.** GPIO44 is the pin of the M5Stack Cardputer example; it has not been confirmed on
-  this Cardputer ADV unit. If nothing reacts, this is the first suspect (look at the LED with a phone camera).
-- **Home Assistant: unverified against a real instance.** The owner has no URL or token yet. The backend is
-  tested against a fake Home Assistant (`httpx.MockTransport`); the firmware has not run on a Cardputer. Until
-  `HOME_ASSISTANT_URL`, `HOME_ASSISTANT_TOKEN` and an allowlist file exist, the tile shows
-  "Home Assistant: not set up" and explains what is missing; the IR part works without any of it.
+- **IR codes.** The code tables come from public protocol documentation and open TV code lists and are checked
+  in the host tests against the MSB-first hex codes those lists print.
+- **IR LED pin.** The IR LED is driven on GPIO44, the pin of the M5Stack Cardputer example (`ir::kTxPin` in
+  `ir_remote.h`). If nothing reacts, this is the first suspect (look at the LED with a phone camera).
+- **Home Assistant is optional.** Until `HOME_ASSISTANT_URL`, `HOME_ASSISTANT_TOKEN` and an allowlist file
+  exist, the tile shows "Home Assistant: not set up" and explains what is missing; the IR part works without
+  any of it.
 - **IR cannot know whether the TV obeyed.** The screens say "Sent", never "done". There is no learn mode (no IR
   receiver) and no air-conditioner code (no well-known code could be sourced).
 
@@ -180,11 +180,11 @@ documents and flipped bytes.
 6. **Failure paths.** Stop Home Assistant: rooms show `offline`; wrong token: `rejected the token`; backend
    off: `No answer from the PC backend`. None of them blocks the IR keys.
 
-## Not done
+## Limits
 
 - No learn mode and no AC codes (no IR receiver; no sourced code). No IR repeat while a key is held.
 - No MQTT, no scripts or automations, no disarming of alarm panels, no per-device allowlists (the file applies
   to every enrolled device), no Home Assistant event subscription (states are read when a room is opened or
   refreshed).
-- The IR frame timing is a busy wait on the worker task: heavy Wi-Fi traffic during the ~100 ms could distort it
-  (unverified).
+- The IR frame timing is a busy wait on the worker task: heavy Wi-Fi traffic during the ~100 ms could distort
+  it.

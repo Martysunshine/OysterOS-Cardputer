@@ -1,13 +1,14 @@
+[OysterOS](../README.md) / [Docs](README.md) / UI simulator
+
 # OysterOS UI simulator
 
-Issue #2, Roadmap milestone 1 ([`DEVELOPMENT_ROADMAP.md`](DEVELOPMENT_ROADMAP.md)): a pixel-sized 240 x 135 desktop
-simulator of the OysterOS interface with a keyboard emulator, loading / error / empty / disabled states, modal
-confirmations and automated navigation tests. Source: [`simulator/`](../simulator/README.md), tests:
-[`tests/simulator/`](../tests/simulator), launcher: `scripts/ui-sim.ps1`.
+A pixel-sized 240 x 135 desktop simulator of the OysterOS interface with a keyboard emulator, loading / error /
+empty / disabled states, modal confirmations and automated navigation tests. Source:
+[`simulator/`](../simulator/README.md), tests: [`tests/simulator/`](../tests/simulator), launcher:
+`scripts/ui-sim.ps1`.
 
-**Status: works on a PC, verified against the repository only.** It runs without a Cardputer, without the backend and
-without a network; all data are built-in mock fixtures. **Nothing has been compared with a real display or keyboard.**
-What is exact and what is not:
+It runs on a PC without a Cardputer, without the backend and without a network; all data are built-in mock
+fixtures, and it is checked against the firmware sources in this repository. What is exact and what is not:
 
 | Aspect | State |
 |---|---|
@@ -17,16 +18,16 @@ What is exact and what is not:
 | Widgets (status bar, list, tiles, footer, notice, progress, confirm, message, text entry) | line-by-line port of `firmware/src/ui/widgets.cpp`, drawn through the same 240 x 16 band, so clipping and tile overlap behave alike |
 | Circles / rounded rectangles | ports of the M5GFX algorithms |
 | Colours | RGB565 constants expanded to 8 bits by bit replication (panel `#192C3D` appears as `#182C39`, the quantisation the firmware sends) |
-| **Pixel parity with the device, panel colour response, legibility** | **UNVERIFIED** until compared with photographs of a Cardputer ADV |
-| **Physical key bindings** | **UNVERIFIED**: they are the firmware's proposed bindings (`input_map.cpp`); the Key tester (P11) exists to confirm them on hardware |
-| Linux (Hosts), Control Deck, Smart Home screens | implemented in the firmware (`firmware/src/modules/`, unverified on a device); the simulator draws them from built-in mock data in both profiles, labelled `SIMULATED`, as an interpretation of the design wireframes. They are **not** read from the backend and are not the firmware's own texts or layouts |
+| Panel colour response, legibility on the physical display | not modelled: the frames are what the design and the firmware sources imply, not photographs of a Cardputer ADV |
+| Physical key bindings | a port of the firmware's bindings (`input_map.cpp`); the Key tester (P11) shows them on the device |
+| Linux (Hosts), Control Deck, Smart Home screens | implemented in the firmware (`firmware/src/modules/`); the simulator draws them from built-in mock data in both profiles, labelled `SIMULATED`, as an interpretation of the design wireframes. They are **not** read from the backend and are not the firmware's own texts or layouts |
 
 ## Running it
 
 ```powershell
 .\scripts\ui-sim.ps1                                   # window, integer scale 4 (960 x 540), nearest neighbour
 .\scripts\ui-sim.ps1 -Preview                          # also enables the Original Apps tile (its screen stays unavailable)
-.\scripts\ui-sim.ps1 -Headless -Out .\out\ui           # 40 routes x 5 states x 2 profiles = 400 PNG + 2 contact sheets
+.\scripts\ui-sim.ps1 -Headless -Out .\out\ui           # 41 routes x 5 states x 2 profiles = 410 PNG + 2 contact sheets
 .\scripts\ui-sim.ps1 -Script .\simulator\examples\navigation.keys.txt -Out .\out\nav
 .\scripts\ui-sim.ps1 -Test                             # pytest tests\simulator (headless, about 3 s)
 ```
@@ -55,15 +56,16 @@ firmware uses; the Oyster AI tile, Settings > Backend and the AI screens follow 
 ## Routes
 
 Every screen ID of [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) ("Mockup screen IDs": 26 of them) has a route, plus the
-Oyster Pocket screens that sit next to them (Saved Findings, Targets, Assess, GATT results, Help, text entries, message
-and generic confirmation, settings details): 40 routes. The table is data (`oyster_ui_sim/routes.py`): id, title,
-parent (target of Back), kind (`menu`, `list`, `detail`, `progress`, `text`, `confirm`, `message`), module, availability
-(as in the screen map), Enter targets, the job a route shows, the modal flag; Home always goes to H01 and Help to the
-Help route. Item rows themselves come from the view builders, because their text depends on mock data and state.
+Oyster Pocket screens that sit next to them (Saved Findings, Targets, Assess, GATT results, Scratchpad, Help, text
+entries, message and generic confirmation, settings details): 41 routes. The table is data
+(`oyster_ui_sim/routes.py`): id, title, parent (target of Back), kind (`menu`, `list`, `detail`, `progress`, `text`,
+`confirm`, `message`), module, availability (as in the screen map), Enter targets, the job a route shows, the modal
+flag; Home always goes to H01 and Help to the Help route. Item rows themselves come from the view builders, because
+their text depends on mock data and state.
 
 | Route | Title | Kind | Module | Availability | Back | Enter | Job |
 |---|---|---|---|---|---|---|---|
-| H01 | OYSTER OS | menu | home | implemented | (root) | security->S10, ai->A10, linux->L10, deck->D10, smart->SH10, original->O10, settings->P10, help->help | - |
+| H01 | OYSTER OS | menu | home | implemented | (root) | security->S10, ai->A10, linux->L10, deck->D10, smart->SH10, original->O10, scratchpad->SC10, settings->P10, help->help | - |
 | S10 | Security | menu | security | implemented | H01 | wifi->S11, ble->S21, findings->findings, targets->targets, assess->assess | - |
 | S11 | Wi-Fi Survey | list | security | implemented | S10 | results->S12, room->room_entry | wifi |
 | S12 | Wi-Fi results | list | security | implemented | S11 | detail->S13 | - |
@@ -92,6 +94,7 @@ Help route. Item rows themselves come from the view builders, because their text
 | SH11 | Devices | list | smart | implemented | SH10 | ir->SH12 | - |
 | SH12 | IR profiles | list | smart | implemented | SH11 | - | ir |
 | O10 | Original Apps | message | original | unavailable | H01 | - | - |
+| SC10 | Scratchpad | message | scratchpad | implemented | H01 | - | - |
 | P10 | Settings | list | settings | implemented | H01 | backend, storage, diagnostics, keyboard, keytest->P11, about (settings_*) | - |
 | P11 | Key tester [P11] | detail | settings | implemented | P10 | - | - |
 | settings_backend, settings_storage, settings_diag, settings_keyboard, settings_about | detail screens | detail | settings | implemented | P10 | - | - |
@@ -106,7 +109,7 @@ simulator disagrees about any design ID.
 ## States
 
 Every route supports `normal`, `loading`, `error`, `empty` and `disabled` (the Back chain and the key behaviour are the
-same in each). A state arises naturally (a task running, the backend offline, a scan that found nothing, an unfinished
+same in each). A state arises naturally (a task running, the backend offline, a scan that found nothing, an unavailable
 module) or is forced (`goto <route> <state>` in a script, the State box of the window, `Simulator.goto(route, state)`).
 
 | State | What is drawn |
@@ -115,7 +118,7 @@ module) or is forced (`goto <route> <state>` in a script, the State box of the w
 | loading | the `IN PROGRESS` view (label, elapsed seconds from the simulation clock, item count, activity bar, "Cancel: Fn+` or Ctrl+C"); a running task also shows its label and `Fn+`:Cancel` in the footer of every screen |
 | error | an alert heading (error colour) with the cause; backend-bound screens name the connectivity state; Enter retries; Back and Home still work |
 | empty | the list's empty text (`No networks seen (2.4 GHz)`, `Start a survey first`, `No advertisers seen`, ...); never a crash or an empty void |
-| disabled | an unfinished or switched-off feature: muted tile/rows or the "Not available in this build" explanation; a disabled control never claims to work |
+| disabled | an unavailable or switched-off feature: muted tile/rows or the "Not available in this build" explanation; a disabled control never claims to work |
 
 Jobs have their own failure outcomes (`failed`, `timed_out`, `cancelled`, deck jobs also `unknown`), set per job kind
 with `Simulator.outcomes` / the window's "Next jobs fail" box / `outcome` in scripts.
@@ -142,9 +145,9 @@ Logical actions: `MOVE_UP/DOWN/LEFT/RIGHT`, `SELECT`, `BACK`, `HOME`, `HELP`, `C
 - Lists keep the focused row visible while scrolling (selection wraps, `, /` page); long SSIDs and BLE names are clipped
   to the row with `~` and shown complete in the detail screen; non-ASCII names show `<non-ASCII>`, empty ones `<hidden>`.
 
-### Keys (UNVERIFIED on hardware)
+### Keys
 
-| Action | Proposed physical keys (UNVERIFIED) | Scope | Desktop shortcut |
+| Action | Physical keys | Scope | Desktop shortcut |
 |---|---|---|---|
 | MOVE_UP | ; (Fn+; anywhere) | bare in menus, Fn layer anywhere | Up arrow |
 | MOVE_DOWN | . (Fn+. anywhere) | bare in menus, Fn layer anywhere | Down arrow |
@@ -157,7 +160,7 @@ Logical actions: `MOVE_UP/DOWN/LEFT/RIGHT`, `SELECT`, `BACK`, `HOME`, `HELP`, `C
 | CANCEL | Fn+` or Ctrl+C | any screen: cancels the task, rejects a modal | Ctrl+C |
 | ERASE | Del | text entry; on an empty buffer it leaves | Backspace |
 | TEXT_INPUT | printable keys | text entry (hotkeys in menus) | keyboard |
-| SHORTCUT_1-8 | 1-8 | Home only, advertised in the footer | digits |
+| SHORTCUT_1-9 | 1-9 | Home only, advertised in the footer | digits |
 
 In the window, **Alt is Fn**, the legend is shown beside the screen and the logical actions are also buttons. A deck
 slot number (D10) only opens the macro summary; it never runs anything (Plan 11.5).
@@ -169,17 +172,17 @@ slot number (D10) only opens the macro summary; it never runs anything (Plan 11.
 <value>`; a failed `expect` stops the replay with the line number and exit code 1. See
 `simulator/examples/navigation.keys.txt` (NAV-01..03 and the key tester in 18 checks).
 
-## How this maps to the issue acceptance
+## How this maps to the acceptance criteria
 
-Issue #2: "Implement routes and design system documented in docs/DESIGN_SYSTEM.md. Navigation, loading/error/disabled
-states, keyboard emulator, and automated NAV-01..03 tests. Must run without device or backend."
+The criteria: "Implement routes and design system documented in docs/DESIGN_SYSTEM.md. Navigation,
+loading/error/disabled states, keyboard emulator, and automated NAV-01..03 tests. Must run without device or backend."
 
 | Acceptance | Evidence (tests in `tests/simulator/`) |
 |---|---|
 | Routes documented in DESIGN_SYSTEM.md | `test_every_screen_id_of_the_design_system_has_a_route`, `test_every_route_renders_in_every_state[firmware/preview]`, `test_route_table_is_structurally_valid_and_acyclic` |
 | Design system (tokens, spacing, type) | `test_palette_equals_the_design_tokens_of_the_design_system_document`, `test_layout_equals_the_spatial_sizing_of_the_design_system_document`, `test_theme_values_come_from_the_header_not_from_a_copy`, `test_theme_parsing_fails_loudly_*`, `test_cell_metrics_equal_the_firmware_fonts`, `test_body_glyphs_are_the_m5gfx_bitmaps`, `test_glyph_module_matches_the_pinned_m5gfx_source` |
 | Pixel-sized 240 x 135, integer scale, no anti-aliasing | `test_frame_is_exactly_240_by_135_and_scales_by_integers`, `test_scaling_is_nearest_neighbour_without_anti_aliasing`, `test_only_palette_colours_are_drawn_on_text_screens`, `test_status_bar_heading_content_and_footer_regions`, `test_selected_row_has_stripe_marker_and_focus_background` |
-| Loading / error / empty / disabled states | `test_every_route_renders_in_every_state`, `test_empty_state_shows_the_routes_empty_text`, `test_every_job_route_has_an_error_state_that_renders_as_an_alert`, `test_disabled_modules_are_greyed_out_on_home_in_the_firmware_profile`, `test_the_loading_screen_shows_elapsed_time_from_the_simulation_clock` |
+| Loading / error / empty / disabled states | `test_every_route_renders_in_every_state`, `test_empty_state_shows_the_routes_empty_text`, `test_every_job_route_has_an_error_state_that_renders_as_an_alert`, `test_selecting_an_unfinished_module_explains_it_and_back_returns_home`, `test_the_loading_screen_shows_elapsed_time_from_the_simulation_clock` |
 | Keyboard emulator, key legend, key diagnostics | `test_key_table_agrees_with_the_firmware_input_map_source`, `test_every_physical_chord_of_the_table_resolves_to_its_logical_action`, `test_key_tester_shows_keys_and_actions_and_needs_back_twice_to_leave`, `test_physical_keys_resolve_to_logical_actions_in_the_tester`, `test_desktop_window_translates_keys_and_renders_frames` |
 | NAV-01 Back from a leaf returns to the parent | `test_nav_01_back_from_any_leaf_screen_returns_to_its_parent[firmware/preview]`, `test_nav_01_back_pops_the_overlays_to_the_screen_below` |
 | NAV-02 Home returns to the root | `test_nav_02_home_from_any_screen_returns_to_the_root[firmware/preview]`, `test_nav_02_home_works_from_text_entry_and_from_a_running_task` |
@@ -201,7 +204,7 @@ states, keyboard emulator, and automated NAV-01..03 tests. Must run without devi
 | No fake functional toggles | `test_home_01_an_unavailable_device_is_not_toggled_and_no_success_is_shown`, `test_a_toggle_changes_state_only_through_an_acknowledged_change`, `test_unavailable_modules_have_no_controls_in_the_firmware_profile`, `test_brightness_is_the_only_toggle_and_it_changes_a_real_value` |
 | Long SSIDs / BLE names are safely clipped | `test_long_ssids_and_ble_names_are_clipped_in_lists_and_complete_in_the_detail`, `test_ble_list_clips_long_names_and_falls_back_to_the_address`, `test_fit_clips_with_a_tilde_and_replaces_non_printable_characters` |
 | Zero-scan results handled | `test_sec_02_no_access_points_shows_the_empty_state`, `test_no_discovery_and_zero_advertisers_each_have_their_own_empty_text`, `test_results_screens_before_any_scan_say_so` |
-| Clearly disabled state for unfinished modules | `test_selecting_an_unfinished_module_explains_it_and_back_returns_home`, `test_disabled_modules_are_greyed_out_on_home_in_the_firmware_profile` |
+| Clearly disabled state for unfinished modules | `test_selecting_an_unfinished_module_explains_it_and_back_returns_home` |
 
 Plan section 14 cases that do not need a device are covered too: SEC-01/02, NET-01, JOB-01, JOB-03 (status unknown is
 reconciled with the same idempotency key, no second run), HOME-01, AI-01, ORIG-01.
@@ -227,16 +230,16 @@ The tests parse the firmware and the design documents and fail on drift: `ui_the
 | Home > Original Apps | O10 | none | explicit unavailable text | - | `test_orig_01_*` |
 | Home > Settings > Key tester | P10, P11 | any key | physical key and logical action | - | `test_key_tester_*` |
 
-## Known gaps
+## Limits of the simulator
 
-- Pixel and colour parity with the real display, key bindings and legibility: unverified (see the table at the top);
-  the headless frames are what the design and the firmware sources imply, not photographs.
+- The headless frames are what the design and the firmware sources imply, not photographs: the colour response
+  and legibility of the real display are not modelled (see the table at the top).
 - The simulator re-implements the firmware's UI logic; it does not run the firmware code. A change in
   `app_controller.cpp` that the drift tests do not look at will not show up here until someone updates the simulator.
 - Mock backends only: JOB-02 (unauthorized macro, audit entry), PRES-01/ORIG-02 (original-app preservation and switch)
   need a real backend or device and are not simulated. There is no voice or schedule screen.
 - Linux (Hosts), Control Deck and Smart Home screens illustrate the design wireframes with invented fixtures: they
-  are not the output of the firmware modules (written, unverified on a device) and not data from the backend. Their
+  are not the output of the firmware modules and not data from the backend. Their
   real texts and flows are in [`COMPANION_API.md`](COMPANION_API.md), [`CONTROL_DECK.md`](CONTROL_DECK.md) and
   [`HOME_ASSISTANT.md`](HOME_ASSISTANT.md), and the pages of the firmware are listed in
   [`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md).

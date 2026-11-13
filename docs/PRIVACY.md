@@ -1,7 +1,9 @@
+[OysterOS](../README.md) / [Docs](README.md) / Privacy
+
 # Privacy: what leaves your PC
 
 This page covers the data the backend sends to the AI provider and a few related local files. Secrets
-handling in general is in the [README](../README.md#secrets).
+handling in general is in the [README](../README.md#scope-and-responsible-use).
 
 ## What the AI provider receives
 

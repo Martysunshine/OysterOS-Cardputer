@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-001
+
 # ADR-001: Firmware toolchain and build
 
 **Status:** accepted (2026-10-24) · verify at M0 against `docs/BUILD_MATRIX.md`

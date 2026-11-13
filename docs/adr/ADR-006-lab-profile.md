@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-006
+
 # ADR-006: Lab profile and diagnostic transfer
 
 **Status:** accepted (2026-10-24)

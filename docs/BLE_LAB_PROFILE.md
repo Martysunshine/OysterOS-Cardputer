@@ -1,3 +1,5 @@
+[OysterOS](../README.md) / [Docs](README.md) / BLE lab profile
+
 # BLE lab profile `oyster-lab-v1`
 
 This page explains `schemas/lab-profile.json` in readable form. **The JSON file is the source of truth**
@@ -105,8 +107,8 @@ transport timeout. The state is reconciled first.
 
 The enrolled test credential is shared out of band. On the PC it is `LAB_FIXTURE_AUTH_TOKEN` (at least
 32 bytes; the HMAC key is its UTF-8 bytes), and the enrolled client holds the same value. The simulator
-models that client today. Handling it on the Cardputer is part of M4 and is not built yet. **The token
-itself never travels over the air.**
+models that client. The Cardputer firmware does not perform this exchange: it answers the operations that
+need it (the M4 tests) with `unsupported`. **The token itself never travels over the air.**
 
 ```
 Central                                           Fixture
@@ -132,7 +134,7 @@ Central                                           Fixture
 | Scope | **fixture-global**, one client at a time; cleared by `reset-state` ([ADR-007](adr/ADR-007-fixture-auth-state.md)) |
 
 WinRT does not expose a reliable per-peer identity on every request, so per-connection authorisation
-state is **unsupported** on this route and is listed that way in the capability matrix. A failed attempt
+state is **unsupported** on this route and is listed that way by `.\scripts\fixture.ps1 check`. A failed attempt
 leaves the current state unchanged. `.\scripts\fixture.ps1 reset-state` clears authorisation, challenge,
 transfer and virtual-LED state of a running fixture. A freshly started fixture is always unauthorised.
 
@@ -217,8 +219,8 @@ To check a transferred file on the PC: `.\scripts\fixture.ps1 synth` writes the 
 
 ## 6. Access-check event details (`ble_check_access_policy`)
 
-Each access check produces one event. Its `details` object contains these fields (same contract for the
-simulator now and the firmware at M4):
+Each access check produces one event. Its `details` object contains these fields (the contract the
+simulator implements):
 
 | Field | Type | Meaning |
 | --- | --- | --- |
@@ -265,7 +267,7 @@ attribute is never a finding, and a timeout or unsupported state is never a pass
 ## 8. Target identity and remote reads on the Cardputer
 
 These rules are in the firmware (`oyster_core/lab_identity.h`, `src/ble_explorer.cpp`,
-`src/operations.cpp`). They are written and host-tested where possible, but **unverified on hardware**.
+`src/operations.cpp`); the platform-independent part is covered by host tests.
 
 ### Choosing and verifying the target (fail closed)
 
@@ -285,7 +287,7 @@ authentication**: any device can serve the same string. The evidence records how
 
 **Recommendation: enrol the target's address.** Take it (and its type) from the detail view of the
 `OysterLab` row in a Cardputer discovery result. Windows Bluetooth settings also show the PC adapter's
-address, but whether the fixture advertises from that address has not been checked.
+address, but the fixture may advertise from a different one.
 
 ### What a remote job may read
 
@@ -294,5 +296,6 @@ address, but whether the fixture advertises from that address has not been check
   one. Today that leaves `public_sensor`, `diag_status`, `virtual_led` and `device_info`. Anything else is
   refused before the radio is used and recorded as `denied`.
 - Protected access happens only through the access-policy assertions (section 2), gated by local
-  confirmation when the assertion writes or transfers. The device side of those is M4.
+  confirmation when the assertion writes or transfers. On the Cardputer these are the M4 tests, which the
+  firmware answers with `unsupported`; the simulator runs them.
 - Reads chosen on the device by the person holding it are not restricted.

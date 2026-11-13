@@ -1,3 +1,5 @@
+[OysterOS](../README.md) / [Docs](README.md) / Web access
+
 # Web access for Oyster AI (web_search, web_fetch)
 
 The assistant can look things up on the internet when the owner asks a general question: `web_search` sends one
@@ -8,15 +10,13 @@ and nothing leaves the PC except the AI provider traffic described in [`PRIVACY.
 the dispatch in `backend/oyster/ai/orchestrator.py`. Tests: `tests/web/`, `tests/ai/test_ai_web_tools.py`.
 Decision record: [ADR-010](adr/ADR-010-web-access.md).
 
-## Status, stated plainly
+## Design notes
 
-- **Not tried against the real search provider.** The owner has no API key yet. The Brave Search adapter is
-  written from the provider's public documentation and tested against a fake provider only. The first real run
-  may surface a difference in the response shape; the adapter then returns `bad_response` or an empty result list
-  rather than failing the run.
-- **Not seen on the device.** The Cardputer shows the final answer like any other; nothing in the firmware changed.
-- The address rules below are unit-tested; DNS rebinding (a resolver answering differently on the library's own
-  second lookup) is a known residual risk, see ADR-010.
+- **Search provider.** The Brave Search adapter is written from the provider's public documentation. A
+  response it cannot read becomes `bad_response` or an empty result list rather than failing the run.
+- **On the device.** The Cardputer shows the final answer like any other; the firmware has no web code.
+- **Residual risk.** DNS rebinding (a resolver answering differently on the library's own second lookup) is
+  not stopped by the address rules below, see ADR-010.
 
 ## How to enable
 
@@ -71,7 +71,7 @@ a search result is compacted to title and domain per entry; fetched text is with
   `http_<status>`, `too_large`, `unsupported_content_type`, `unreachable`, `bad_response`, `invalid_url`,
   `unresolvable_host`); the model is expected to say so in its answer.
 
-## What to check on the first real run
+## How to check it
 
 1. `oyster ask "What is the current Bluetooth Core Specification version?"` with web access on: the run record
    (`GET /v1/runs/{id}`) should show a `backend_tool` step `web_search` with `outcome: succeeded` and a

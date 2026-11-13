@@ -1,4 +1,6 @@
-# Smart Control Deck (Issue #4)
+[OysterOS](../README.md) / [Docs](README.md) / Control Deck
+
+# Smart Control Deck
 
 Macro pad for the owner's own PC: profiles with slots 1-9, typed allowlisted actions, confirmation of
 impactful actions on the Cardputer, an idempotent job state machine, an audit trail and history. Code:
@@ -6,24 +8,13 @@ impactful actions on the Cardputer, an idempotent job state machine, an audit tr
 `firmware/lib/oyster_core/{include/oyster_core/deck_json.h,src/deck_json.cpp}` (device). Tests: `tests/deck/`,
 `firmware/test/test_deck/`.
 
-## Status, stated plainly
+## Executors
 
-- **Two executors.** `MockExecutor` is the default: it records the typed action and executes **nothing on any
-  host** (jobs carry `"executor": "mock"`, the device says "Mock executor: nothing was run on the PC").
-  `WindowsExecutor` (`executor_windows.py` with the OS layer `os_windows.py`) acts on the machine the backend
-  runs on; jobs carry `"executor": "windows"`. It is selected with `OYSTER_DECK_EXECUTOR=windows` (see
-  "Configuration"); without that setting, and in every test run, nothing is executed.
-- **Verified on the real PC, read-only parts only.** On one Windows 11 machine (not elevated) the real OS layer
-  was constructed and asked for host health, the state of two real services and a missing one, the elevation
-  state, and a restart of a service name that does not exist (answers "service not found" and touches
-  nothing). **Not verified on a real session:** the media-key presses, the workstation lock, Wake-on-LAN
-  packets and service restarts. Those are covered by unit tests against a fake OS layer only
-  (`tests/deck/test_deck_executor_windows.py`); treat them as unverified until they have been run on the PC.
-- **Firmware built, not verified on hardware.** The Control Deck module (screens D10, D11, D20, D21, D22) is
-  implemented in the firmware and compiles; its parsers and texts are host-tested. It has **not run on a
-  Cardputer** and has not talked to a real backend.
-- **Wiring.** The module is self-contained. It becomes part of the backend with one call, `install(app)`
-  (see "Wiring").
+There are two executors. `MockExecutor` is the default: it records the typed action and executes **nothing on
+any host** (jobs carry `"executor": "mock"`, the device says "Mock executor: nothing was run on the PC").
+`WindowsExecutor` (`executor_windows.py` with the OS layer `os_windows.py`) acts on the machine the backend
+runs on; jobs carry `"executor": "windows"`. It is selected with `OYSTER_DECK_EXECUTOR=windows` (see
+"Configuration"); without that setting, and in every test run, nothing is executed.
 
 ## Wiring
 
@@ -235,7 +226,7 @@ Device responses are bounded by construction (at most 3 steps) and stay under 4 
 ## Device flow (Cardputer, `firmware/src/modules/deck.cpp`)
 
 Home tile 4. The module draws one page at a time through the module framework (`firmware/include/modules.h`);
-network work runs on the worker task, the UI never blocks. Not run on a real device yet.
+network work runs on the worker task, the UI never blocks.
 
 | Page | Screen | Content and keys |
 | --- | --- | --- |
@@ -271,9 +262,7 @@ Rules the device follows:
 ## Claude Code row (`deck.cpp`, `oyster_core/claude_json.*`)
 
 Answer "may Claude Code run this tool?" from the Cardputer and read a one-line usage status. Backend contract:
-`docs/CLAUDE_CODE_LINK.md`. **Status: compiles and is host-tested against a scripted fake backend
-(`firmware/test/test_claude/`). Not run on a Cardputer, not run against the real backend routes, never against a
-live Claude Code session.**
+`docs/CLAUDE_CODE_LINK.md`. Host tests, against a scripted fake backend: `firmware/test/test_claude/`.
 
 | Page | Content and keys |
 | --- | --- |
@@ -294,8 +283,6 @@ Rules the device follows:
   "Details shortened" and advises denying what you cannot judge.
 - **Memory:** state 1696 bytes plus 3072 bytes of worker scratch (one static reply buffer instead of a heap
   block per refresh). No new tasks or timers.
-- Unverified: the key feel and layout on the real 240x135 screen, behaviour against the real backend, TLS
-  timing of the extra calls, and everything that happens inside Claude Code after the answer.
 
 ## Audit and history (`audit.py`)
 
@@ -421,10 +408,10 @@ expire).
 
 ## Acceptance criteria mapped to tests
 
-Issue #4: "Macro profiles with slots 1-9, confirmation dialog, job state transitions, idempotency,
+The requirement: "Macro profiles with slots 1-9, confirmation dialog, job state transitions, idempotency,
 authorization, audit and history. Only allowlisted typed actions."
 
-| Issue requirement | Module / endpoint | Tests (`tests/deck/`) |
+| Requirement | Module / endpoint | Tests (`tests/deck/`) |
 | --- | --- | --- |
 | Macro profiles, slots 1-9 | `profiles.py`; `PUT/GET/DELETE /v1/deck/profiles/{id}`, `GET /v1/deck/profiles` | `test_deck_profiles.py`: `test_define_get_list_and_delete_roundtrip`, `test_slot_numbers_outside_1_to_9_are_rejected_at_definition`, `test_slots_1_and_9_are_accepted_and_runnable`, `test_running_slot_0_or_10_is_rejected`, `test_slot_labels_are_bounded_printable_ascii`, `test_a_slot_holds_one_action_or_an_ordered_list_of_at_most_three`, `test_actions_may_only_reference_listed_hosts_and_services`, `test_structural_limits`, `test_device_sees_only_profiles_bound_to_it_in_compact_form`, `test_device_profile_list_is_paginated_and_stays_under_4_kib`, `test_replacing_a_profile_cancels_unstarted_jobs_but_not_running_ones`, `test_deleting_a_profile_cancels_its_unstarted_jobs` |
 | Only allowlisted typed actions | `actions.py`; checked at definition, at run and in the runner | `test_deck_actions.py`: `test_allowlist_is_exactly_the_documented_set`, `test_unknown_action_types_are_rejected`, `test_unknown_action_type_is_rejected_when_a_profile_is_defined`, `test_unknown_action_type_in_a_stored_profile_is_rejected_when_the_slot_runs`, `test_a_tampered_job_row_is_refused_by_the_runner`, `test_extra_fields_are_rejected`, `test_host_ids_are_validated_names`, `test_service_names_are_validated_names`, `test_no_shell_or_exec_like_field_exists_on_any_action_model`, `test_package_source_has_no_shell_exec_or_eval`, `test_impact_is_fixed_per_action_type`, `test_impact_cannot_be_supplied_or_overridden` |
@@ -447,24 +434,19 @@ parser tests with `pio test -e native -f test_deck` (from `firmware/`, host comp
 `scripts/_env.ps1`). The backend tests use a fake clock, deterministic ids and nonces, `MockExecutor` or a fake
 OS layer and temporary SQLite files; none uses the network, presses a key or locks a screen.
 
-## Known gaps
+## Design limits
 
-- **Unverified on a real session:** media-key presses, the workstation lock, Wake-on-LAN packets and service
-  restarts have only been exercised against a fake OS layer. Whether a given player reacts depends on
-  Windows routing the media key to it; the job result only says the key was sent. Whether a woken host came up
-  is not checked.
-- Service restarts need the backend to run elevated and a service on `OYSTER_DECK_RESTART_SERVICES`; the
-  `ctypes` service-control code has been checked only against a service name that does not exist.
-- The device module compiles and its parsers are host-tested, but it has not run on a Cardputer or against a
-  running backend. Leaving the module with Home while a confirmation is open does not tell the module (the
-  job expires on the backend; the leftover is cancelled the next time the module opens).
+- Whether a given player reacts to a media key depends on Windows routing the key to it; the job result only
+  says the key was sent. Whether a woken host came up is not checked.
+- Leaving the module with Home while a confirmation is open does not tell the module (the job expires on the
+  backend; the leftover is cancelled the next time the module opens).
 - The nonce proves "the same authenticated device, holding this job's nonce"; the physical key press on the
   device is not observable by the backend. The device must show the confirmation and send `approved` only after
   the user chose it (as for lab jobs, ADR-005).
 - `unknown_outcome` has no reconcile endpoint; the owner reads it, checks the host and starts a new run.
 - Only the local PC is controlled; there is no remote host executor (SSH, WinRM) and no per-host credential
   handling. A profile that names another host fails with `host_not_local`.
-- Scheduled automations (M6) and conditional macro steps are out of scope: a slot is one action or an ordered
+- Scheduled automations and conditional macro steps are out of scope: a slot is one action or an ordered
   list of at most three.
 - Audit rows are not pruned or exported; the file grows slowly without bound.
 - A job approved just before a crash is reported `unknown_outcome` even if the runner never started it

@@ -1,3 +1,5 @@
+[OysterOS](../README.md) / [Docs](README.md) / Provisioning
+
 # Serial provisioning protocol (v1)
 
 One-time local setup of a Cardputer over its USB-C serial port (115200 baud, USB CDC). Implemented by

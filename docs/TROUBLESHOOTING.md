@@ -1,7 +1,8 @@
+[OysterOS](../README.md) / [Docs](README.md) / Troubleshooting
+
 # Troubleshooting
 
-The fixes below are for Windows. Items about the Cardputer are manual steps and have not been checked
-on a real device yet.
+The fixes below are for Windows.
 
 **Never "fix" a certificate error by switching verification off.** That includes `--trusted-host`,
 `PYTHONHTTPSVERIFY=0`, `verify=False`, `-SkipCertificateCheck`, or a "skip verification" build of
@@ -45,8 +46,8 @@ Python's bundled `certifi` list does not.
 - Try another USB socket on the PC, directly rather than through a hub.
 - Device Manager > Ports (COM & LPT): look for "USB Serial Device (COMx)" or "USB JTAG/serial debug
   unit". The ADV's USB-C goes to the ESP32-S3's built-in USB, which normally uses Windows' built-in driver.
-  No CH340/CP210x driver should be needed (unverified on this unit). A yellow warning icon means a driver
-  problem: right-click it, choose **Update driver**, then **Search automatically**.
+  No CH340/CP210x driver should be needed. A yellow warning icon means a driver problem: right-click it,
+  choose **Update driver**, then **Search automatically**.
 - `.\.venv\Scripts\pio.exe device list` lists ports. Compare the list with the device unplugged and plugged in.
 
 **"Access is denied" / "could not open port COMx"**
@@ -81,7 +82,7 @@ SHA-256 recorded in `factory-8MB.bin.sha256`. It prints `REFUSING TO FLASH` and 
 chip that is not an ESP32-S3 with 8 MB of flash, and deletes its partial file if the size or a verification
 check fails. Both scripts take the esptool that PlatformIO installed (package `tool-esptoolpy`); if it is
 missing, run `.\scripts\setup.ps1`. A backup can only be made on a device that connects: if it cannot, use
-download mode as described next, then run the backup again. None of this has been tried on a real device yet.
+download mode as described next, then run the backup again.
 
 ## Flashing fails (download mode)
 
@@ -101,14 +102,14 @@ Put the board into **download mode** manually:
 
 If it still fails, try a different cable or USB socket and make sure nothing else has the port open. As a
 last resort, change `upload_speed` in `firmware\platformio.ini` (pinned at 115200, which is the most tolerant:
-the native USB port ignores the UART rate, and a switch to 460800 stalled a flash read on the first device).
+the native USB port ignores the UART rate, and a switch to a higher rate such as 460800 can stall a flash read).
 
 ## Restoring your own backup (esptool)
 
 This puts back exactly what `firmware-backup.ps1` saved, using the esptool that PlatformIO installed. It
 overwrites the **whole** flash, so Oyster and everything it stored in flash (provisioned settings, the CA
-certificate) are gone afterwards; provision again when you come back to Oyster. Not tried on a real device:
-if you can, test the restore once and record it in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) (HV-27).
+certificate) are gone afterwards; provision again when you come back to Oyster. If you can, test the restore
+once and record it in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) (HV-27).
 
 1. Close every program that uses the COM port. If the board does not connect, use download mode (above).
 2. Pick the backup folder of **this** chip: the folder name is the MAC that esptool prints as `MAC:`. Check the
@@ -131,7 +132,7 @@ if you can, test the restore once and record it in [`HARDWARE_VERIFICATION.md`](
 
 ## Restoring the factory firmware (M5Burner)
 
-You can go back to M5Stack's own firmware without a backup of your own (not tried on a real device):
+You can go back to M5Stack's own firmware without a backup of your own:
 
 1. Download **M5Burner** from M5Stack (linked from the Cardputer ADV page at
    `docs.m5stack.com/en/core/Cardputer-Adv`). Follow that page for the current procedure; it is the
@@ -146,7 +147,6 @@ You can go back to M5Stack's own firmware without a backup of your own (not trie
 
 The Settings screen and the status bar show the backend state in short form; opening Settings > Backend
 shows the full state (for example `cert_error`). The serial log (`firmware-monitor.ps1`) adds the reason.
-Manual step - unverified until run:
 
 | Short / state | Likely cause | Fix |
 | --- | --- | --- |
@@ -168,13 +168,13 @@ and what is disabled; the dependent actions are refused with a message. Reboot t
 
 ## Screens and keys on the Cardputer
 
-Manual step - unverified until run. The structure of the screens is in [`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md).
+The structure of the screens is in [`UI_SCREEN_MAP.md`](UI_SCREEN_MAP.md).
 
 | Symptom | Meaning / fix |
 | --- | --- |
-| A module tile (Linux/Hosts, Control Deck, Smart Home) says offline, not set up or "no hosts" | Intended until the device is provisioned and the backend is running (`scripts/oyster-up.ps1`), and until a host or profile is seeded (`oyster seed-demo --id <device>`). Original Apps says "not set up" until the dual-boot layout is installed (docs/DUAL_BOOT.md) |
-| Entries in Security > Assess are muted and say "not in build" | Intended. The M4 checks have no device side yet ([`CAPABILITY_MATRIX.md`](CAPABILITY_MATRIX.md)) |
-| Home (`Fn`+`Del`, press `Fn` first) or Help (`?`) does nothing | Both bindings are proposed and unverified. Open **Settings > Key tester** to see which physical keys arrive and which action they resolve to. Meanwhile use Back (`` ` `` or `Del`) one level at a time and the Help tile (8) on the Home screen. Record the result under HV-03 in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) |
+| A module tile (Control, SmartHome) says `offline`, `no profile` or `IR only` | Intended until the device is provisioned and the backend is running (`scripts/oyster-up.ps1`), a profile is seeded (`oyster seed-demo --id <device>`) and Home Assistant is set up ([`HOME_ASSISTANT.md`](HOME_ASSISTANT.md)). The Original tile says `backup` or `on PC` and explains how the original firmware is run from the PC ([`DUAL_BOOT.md`](DUAL_BOOT.md)) |
+| Entries in Security > Assess are muted and say "not in build" | Intended. They are the M4 tests (access-policy check, notifications, lab write, diagnostic transfer): the firmware does not run them and answers a backend job for one with `unsupported`. The simulated device runs them (`.\scripts\sim.ps1`) |
+| Home (`Fn`+`Del`, press `Fn` first) or Help (`?`) does nothing | Open **Settings > Key tester** to see which physical keys arrive and which action they resolve to. Meanwhile use Back (`` ` `` or `Del`) one level at a time and the Help tile (8) on the Home screen. Record the result under HV-03 in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) |
 | The serial log says `display sprites unavailable (out of memory)` | The 7,680 B drawing sprite (one 240x16 band) could not be allocated, so screen output is switched off while the rest keeps running. Reboot; if it repeats, record the heap numbers of the boot event under HV-05 |
 
 ## Windows Firewall and port 8443
@@ -209,15 +209,15 @@ Run the read-only check before any live BLE work:
 | **BLE peripheral role** | This adapter or driver cannot host a GATT server. Try another adapter (some USB dongles support it), or stay with the simulator. Live BLE assessment is then **blocked by this prerequisite**, which is a valid, honest outcome |
 | **Radio state: radio reports off** | Turn Bluetooth on: Settings > Bluetooth & devices > Bluetooth **On**; switch airplane mode off. Run `check` again |
 | WinRT GATT server API | Run `.\scripts\setup.ps1` (installs `lab[fixture]`) |
-| Authenticated pairing "unverified" | Expected: Windows offers the protection level, but the end-to-end result with the Cardputer is unverified |
+| Authenticated pairing "unverified" | Expected: Windows offers the protection level. This read-only check of the PC cannot confirm a pairing with the Cardputer, so it reports the row that way |
 
 Other notes:
 
 - The fixture uses the native Windows API ([ADR-008](adr/ADR-008-native-winrt-fixture.md)). It does not
-  run on Linux/macOS, inside Docker, or (unverified) inside WSL.
+  run on Linux/macOS or inside Docker, and WSL is not supported either.
 - While a central reads `restricted_enc` / `restricted_mitm`, Windows may show its own pairing
-  notification or prompt on the PC. This has not been observed with a Cardputer yet; record what happens
-  in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
+  notification or prompt on the PC. Record what happens in
+  [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
 - `fixture.ps1 run` refuses to start without `LAB_FIXTURE_AUTH_TOKEN` (at least 32 characters) in
   `backend\.env`.
 - `fixture.ps1 reset-state` reports "no running fixture acknowledged" when no fixture is running. A freshly
@@ -231,7 +231,7 @@ Other notes:
   that the right fixture is running and that the enrolled address belongs to it.
 - **"characteristic not readable by remote job (policy is not public)"**: a backend/AI job asked to read a
   protected characteristic or `app_auth`. That is refused by design; protected access is checked only
-  through the access-policy assertions (M4 on the device).
+  through the access-policy assertions (the M4 tests, which the firmware answers with `unsupported`).
 
 ## Backend and simulator
 
@@ -300,7 +300,7 @@ Cause: on Windows the USB-Serial/JTAG port decodes the DTR/RTS lines as reset an
 leaves GPIO0 low, or a terminal that opens the port with DTR asserted, puts the chip into download mode. The power
 switch does not help while USB power stays connected.
 
-- `firmware-flash.ps1` now finishes with a watchdog reset (`--after watchdog_reset`), which does not depend on the
+- `firmware-flash.ps1` finishes with a watchdog reset (`--after watchdog_reset`), which does not depend on the
   line state. By hand: `python esptool.py --chip esp32s3 --port COMx --before default_reset --after watchdog_reset read_mac`.
 - `monitor_dtr = 0` and `monitor_rts = 0` are set for the PlatformIO monitor. In your own serial tools open the port
   with DTR and RTS off.

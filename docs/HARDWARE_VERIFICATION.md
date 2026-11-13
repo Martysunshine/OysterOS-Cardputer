@@ -1,11 +1,13 @@
+[OysterOS](../README.md) / [Docs](README.md) / Hardware verification
+
 # Hardware verification checklist
 
-Every item here is a **manual step - unverified until run**. Every result starts as **UNVERIFIED**;
-since 2026-10-25 a Cardputer ADV is attached and the rows marked PASS or PARTIAL below were observed on
-it by the owner. Only a result you observed on the real device may be changed to PASS. A compiler, the simulator or a prerecorded fixture does not count.
+This is the checklist for verifying OysterOS on your own Cardputer ADV. Fill in the Result (`PASS`, `FAIL`
+or `PARTIAL`), the date and the firmware build as you go. Only a result you observed on the real device
+counts: a compiler, the simulator or a prerecorded fixture does not.
 
 Result values: `PASS`, `FAIL`, `PARTIAL` (works with a stated limitation), `BLOCKED` (a prerequisite is
-missing; name it), `UNVERIFIED` (not run yet).
+missing; name it). Leave a row empty until you have run its check.
 
 ## Before the first flash: audit and backup (HV-27, HV-28)
 
@@ -42,45 +44,45 @@ Useful tools:
 
 | ID | Check | Result | Date | FW SHA-256 (first 12) | Evidence / notes |
 | --- | --- | --- | --- | --- | --- |
-| HV-01 | Board id is `board_M5CardputerADV` | UNVERIFIED | | | |
-| HV-02 | Flash 8 MB, PSRAM not found, reset reason logged | UNVERIFIED | | | |
-| HV-03 | Keyboard navigation mapping | UNVERIFIED | | | |
-| HV-04 | Emergency cancel combos on every screen | UNVERIFIED | | | |
-| HV-05 | Display: status bar, lists, progress, dialogs | UNVERIFIED | | | |
-| HV-06 | SD card mounted (FAT32), session files created | UNVERIFIED | | | |
-| HV-07 | SD card missing -> volatile mode shown | UNVERIFIED | | | |
-| HV-08 | SD card full / write error -> visible state, no silent loss | UNVERIFIED | | | |
-| HV-09 | Serial provisioning, secrets never echoed | UNVERIFIED | | | |
-| HV-10 | TLS connect to backend (valid trust) | PASS | 2026-10-27 | n/a | Banner `BACKEND OK`; first attempts failed with TLS -32512/-17040/-9984 from heap exhaustion, fixed by freeing internal RAM (smaller scan buffers, reply buffer allocated after the handshake) |
-| HV-11 | TLS negative: wrong CA / wrong IP / revoked token | UNVERIFIED | | | |
-| HV-12 | Clock: serial seed, SNTP, `clock_quality` | UNVERIFIED | | | |
-| HV-13 | Wi-Fi survey (2.4 GHz), room label, export | UNVERIFIED | | | |
-| HV-14 | BLE discovery sees `OysterLab`, never auto-connects | UNVERIFIED | | | |
-| HV-15 | GATT inspect of the lab service, completeness flag | UNVERIFIED | | | |
-| HV-16 | Profile read of a public value | UNVERIFIED | | | |
-| HV-17 | Cancel latency: UI ack (< 1 s target) and radio stop | UNVERIFIED | | | |
-| HV-18 | Heap telemetry vs goals (64 KiB free / 32 KiB block) | UNVERIFIED | | | |
-| HV-19 | 20 scan / connect / sync cycles | UNVERIFIED | | | |
-| HV-20 | 60-minute mixed-use soak | UNVERIFIED | | | |
-| HV-21 | Backend disconnected during work -> evidence kept, resync | UNVERIFIED | | | |
-| HV-22 | AI provider outage -> `ai_unavailable`, nothing invented | UNVERIFIED | | | |
-| HV-23 | Factory firmware restore with M5Burner (recovery route) | UNVERIFIED | | | |
-| HV-24 | M4: access-policy checks vulnerable vs corrected | BLOCKED (M4 not built) | | | |
-| HV-25 | M4: diagnostic transfer hash + power interruption recovery | BLOCKED (M4 not built) | | | |
-| HV-26 | M4: local confirmation for the virtual-LED write | BLOCKED (M4 not built) | | | |
-| HV-27 | Backup before the first flash: `firmware-backup.ps1` dumps 8 MB with verification; restoring it brings the original firmware back | PASS (dump); restore not tried | 2026-10-25 | n/a | 8,388,608 bytes, `esptool verify_flash` digest matched, valid bootloader and partition table (factory app at 0x10000). A first read at 460800 baud stalled at 19 % and was stopped (nothing written); the default is now 115200. Restore: see HV-23 |
-| HV-28 | Flash gate: `firmware-flash.ps1` refuses without a verified backup of that chip, passes with one | PARTIAL | 2026-10-25 | 0cc446875ad8 | Passed with the verified backup and the upload hash-verified. The refusal path was not tried on the device |
-| HV-29 | Boot splash drawn once at start-up, then the Home screen (heading `OYSTER OS`, tile grid, greyed-out tiles) | PARTIAL (owner-observed) | 2026-10-25 | 0cc446875ad8 | Boot, splash, Home and the four greyed-out tiles were seen on the real display and looked right; no photographs, no flicker/colour measurements. Oyster AI showed unavailable while the device was not yet provisioned |
-| HV-30 | Start screen waits for any key; the G0 button shows the same logo screen as a lock, any key returns to the same screen | PASS | 2026-10-26 | n/a | Seen by the owner, including the battery icon on the start screen |
-| HV-31 | Hosts (Home 3): host list, overview (CPU, memory, disk, uptime, state, age), services, Logs page, tile text `N hosts` / `no hosts` / `offline`, failure texts | UNVERIFIED | | | |
-| HV-32 | Control Deck (Home 4) on the device: profiles and slots, run a slot, impactful confirmation (approve and reject), 700 ms key guard, emergency cancel, lost-answer text, history | UNVERIFIED | | | |
-| HV-33 | Control Deck on the real PC (`OYSTER_DECK_EXECUTOR=windows`): media keys, lock, Wake-on-LAN, service restart | UNVERIFIED | | | |
-| HV-34 | Smart Home IR (Home 5 > IR Remote): IR LED on GPIO44, each TV family against the owner's TV, one frame per key | UNVERIFIED | | | |
-| HV-35 | Smart Home with Home Assistant: unconfigured text first, then a real instance (rooms, devices, an action, impactful confirmation, failure paths) | UNVERIFIED | | | |
-| HV-36 | Status LED: green breathing online, amber blink offline, blue while a confirmation or unread answer waits, teal during a scan, announcements on finish/fail/notice; Help > Enter shows the legend with matching colours | PARTIAL | 2026-10-26 | n/a | Online/offline colours and the legend seen; announcements not yet checked |
-| HV-37 | Direct AI: Oyster AI answers with the backend stopped, over the device's own Wi-Fi | PASS | 2026-10-27 | n/a | Owner asked a question with the backend off and got an answer. Groq serves leaf -> WE1 -> GlobalSign ECC Root CA - R4; `groq_ca.h` bundles that EC chain. The EC handshake needed ~8 KiB more internal RAM (hardware SHA buffer), freed by trimming scan buffers |
-| HV-37a | Status bar: Wi-Fi dot and `ONLINE` banner independent of the backend | PASS | 2026-10-27 | n/a | Wi-Fi joins on boot without the backend; the green Wi-Fi dot and `ONLINE` show while the backend dot stays offline |
-| HV-38 | Scripts (Red Team tile 3): About page, built-in example with no SD card, SD scripts, cancel, errors | UNVERIFIED | | | About page and built-in example opened on the device; steps below not yet run |
+| HV-01 | Board id is `board_M5CardputerADV` | | | | |
+| HV-02 | Flash 8 MB, PSRAM not found, reset reason logged | | | | |
+| HV-03 | Keyboard navigation mapping | | | | |
+| HV-04 | Emergency cancel combos on every screen | | | | |
+| HV-05 | Display: status bar, lists, progress, dialogs | | | | |
+| HV-06 | SD card mounted (FAT32), session files created | | | | |
+| HV-07 | SD card missing -> volatile mode shown | | | | |
+| HV-08 | SD card full / write error -> visible state, no silent loss | | | | |
+| HV-09 | Serial provisioning, secrets never echoed | | | | |
+| HV-10 | TLS connect to backend (valid trust) | | | | |
+| HV-11 | TLS negative: wrong CA / wrong IP / revoked token | | | | |
+| HV-12 | Clock: serial seed, SNTP, `clock_quality` | | | | |
+| HV-13 | Wi-Fi survey (2.4 GHz), room label, export | | | | |
+| HV-14 | BLE discovery sees `OysterLab`, never auto-connects | | | | |
+| HV-15 | GATT inspect of the lab service, completeness flag | | | | |
+| HV-16 | Profile read of a public value | | | | |
+| HV-17 | Cancel latency: UI ack (< 1 s target) and radio stop | | | | |
+| HV-18 | Heap telemetry vs goals (64 KiB free / 32 KiB block) | | | | |
+| HV-19 | 20 scan / connect / sync cycles | | | | |
+| HV-20 | 60-minute mixed-use soak | | | | |
+| HV-21 | Backend disconnected during work -> evidence kept, resync | | | | |
+| HV-22 | AI provider outage -> `ai_unavailable`, nothing invented | | | | |
+| HV-23 | Factory firmware restore with M5Burner (recovery route) | | | | |
+| HV-24 | M4: access-policy checks vulnerable vs corrected | | | | |
+| HV-25 | M4: diagnostic transfer hash + power interruption recovery | | | | |
+| HV-26 | M4: local confirmation for the virtual-LED write | | | | |
+| HV-27 | Backup before the first flash: `firmware-backup.ps1` dumps 8 MB with verification; restoring it brings the original firmware back | | | | |
+| HV-28 | Flash gate: `firmware-flash.ps1` refuses without a verified backup of that chip, passes with one | | | | |
+| HV-29 | Boot splash drawn once at start-up, then the Home screen (heading `OYSTER OS`, tile grid) | | | | |
+| HV-30 | Start screen waits for any key; the G0 button shows the same logo screen as a lock, any key returns to the same screen | | | | |
+| HV-31 | Hosts (Home 3): host list, overview (CPU, memory, disk, uptime, state, age), services, Logs page, tile text `N hosts` / `no hosts` / `offline`, failure texts | | | | |
+| HV-32 | Control Deck (Home 4) on the device: profiles and slots, run a slot, impactful confirmation (approve and reject), 700 ms key guard, emergency cancel, lost-answer text, history | | | | |
+| HV-33 | Control Deck on the real PC (`OYSTER_DECK_EXECUTOR=windows`): media keys, lock, Wake-on-LAN, service restart | | | | |
+| HV-34 | Smart Home IR (Home 5 > IR Remote): IR LED on GPIO44, each TV family against the owner's TV, one frame per key | | | | |
+| HV-35 | Smart Home with Home Assistant: unconfigured text first, then a real instance (rooms, devices, an action, impactful confirmation, failure paths) | | | | |
+| HV-36 | Status LED: green breathing online, amber blink offline, blue while a confirmation or unread answer waits, teal during a scan, announcements on finish/fail/notice; Help > Enter shows the legend with matching colours | | | | |
+| HV-37 | Direct AI: Oyster AI answers with the backend stopped, over the device's own Wi-Fi | | | | |
+| HV-37a | Status bar: Wi-Fi dot and `ONLINE` banner independent of the backend | | | | |
+| HV-38 | Scripts (Red Team tile 3): About page, built-in example with no SD card, SD scripts, cancel, errors | | | | |
 
 ## How to run each check
 
@@ -93,34 +95,33 @@ must show an error screen instead of the menu. **Pass:** ADV id reported and the
 
 ### HV-03 Keyboard mapping
 
-The mapping below is **proposed** in `oyster_core/input_map.h` and only host-tested. Try every row. In
+The mapping below is the one in `oyster_core/input_map.h`. Try every row. In
 the Notes column, record the mapping that actually works, then update `input_map.h` if needed. Use
 **Settings > Key tester** to see what the firmware receives: it shows the physical keys of the last key
 change and the logical action they resolve to, and it only displays the action (nothing is opened or run).
 Pressing Back or Home twice within 2 s leaves the tester; Cancel still works there.
 
-| Action | Proposed keys | Where to try |
+| Action | Keys | Where to try |
 | --- | --- | --- |
 | Up / Down / Left / Right | `;` `.` `,` `/` (bare in menus), `Fn` + same keys anywhere | Home tiles, lists |
 | Select | `Enter` | menus |
 | Back | `` ` `` or `Del` in navigation mode (this keyboard has no plain `Esc` key; `Fn`+`` ` `` is Cancel) | any submenu |
-| Home | `Fn`+`Del` (press `Fn` first), any mode. **PROPOSED, UNVERIFIED** | from a screen several levels deep, from a text entry, and with a confirm dialog open (it is rejected first, after its short key guard) |
-| Help | `?` (`Shift`+`/`), navigation mode only. **PROPOSED, UNVERIFIED** | any list or detail; it must not open over the confirm dialog or in a text entry |
-| Home shortcuts | `1` to `8` on the Home screen only (advertised in the footer) | Home |
+| Home | `Fn`+`Del` (press `Fn` first), any mode | from a screen several levels deep, from a text entry, and with a confirm dialog open (it is rejected first, after its short key guard) |
+| Help | `?` (`Shift`+`/`), navigation mode only | any list or detail; it must not open over the confirm dialog or in a text entry |
+| Home shortcuts | `1` to `9` on the Home screen only (advertised in the footer) | Home |
 | Type text | printable keys; `Del` erases and leaves when the field is empty; `Enter` confirms | room label (Security > Wi-Fi Survey > Room), Oyster AI > Ask a question |
 | Arrows while typing | `Fn` + `;` `.` `,` `/` | text entry |
 | Key tester | Settings > Key tester (screen P11): keys and resolved action shown; Back or Home twice leaves | Settings |
 
 **Pass:** every action works and there are no stuck or duplicated keys. Mark Home and Help PASS only
-after you have seen them work on the device; until then they stay **UNVERIFIED** and are described as
-proposed everywhere. If a chord does not resolve, record the keys the tester did show and change
-`input_map.h`.
+after you have seen them work on the device. If a chord does not resolve, record the keys the tester did
+show and change `input_map.h`.
 
 ### HV-04 Emergency cancel
 
-Proposed combos: **`Fn+`` ` ``** (the firmware reports it as fn+esc; there is no plain Esc key) and **`Ctrl+C`**. Each must work on every screen, including
+Combos: **`Fn+`` ` ``** (the firmware reports it as fn+esc; there is no plain Esc key) and **`Ctrl+C`**. Each must work on every screen, including
 text entry and during a running operation, without opening another menu first. A cancel must not also
-type a character or move the selection. **Pass:** all three combos cancel from every screen tried. List
+type a character or move the selection. **Pass:** both combos cancel from every screen tried. List
 the screens you tried.
 
 ### HV-05 Display
@@ -130,8 +131,7 @@ Check the status bar (mode banner, session id, backend state, battery), paginate
 unreadable colours. The screens are drawn with one 240x16 sprite (7,680 B of RAM) band by band, so also
 look for visible banding or tearing while a screen is redrawn. Take photographs of the main screens (Home,
 Security, a list, a detail view, the progress view, the confirm dialog) and judge font size and the
-palette against [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md); the sizes in `firmware/include/ui_theme.h` have not
-been compared with a real display.
+palette against [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md); the sizes are set in `firmware/include/ui_theme.h`.
 
 The banner shows the first value that applies: `LIVE RADIO` (during a survey, discovery or BLE session),
 `START FAILED` (a module failed at boot; Settings > Diagnostics lists it and dependent actions are refused
@@ -249,7 +249,7 @@ During a survey or GATT session, stop the backend (Ctrl+C in its window). The de
 stop the current operation, keep the evidence on SD, show `OFFLINE`, accept no new remote actions,
 and upload the queued events after the backend returns, with no duplicates on the backend. This later sync
 works only within the same session, before a reboot. Events of an earlier session (ended by New session,
-reboot or power loss) are not uploaded by this firmware (milestone M6); check that they are still on the
+reboot or power loss) are not uploaded by this firmware; check that they are still on the
 card and that the new session has a recovery event with `sync_status` `not_uploaded_milestone_m6`.
 
 ### HV-22 Provider outage
@@ -304,19 +304,16 @@ them.
    mascot blink, until a key is pressed (USB provisioning is still served meanwhile). Look for flicker, tearing,
    wrong colours (the art was converted to RGB565 on a PC), and check that the key that starts the system does
    not also act on Home.
-2. The first screen is Home, headed `OYSTER OS`, with a two-column tile grid: Security, Oyster AI and Linux
-   on the left; Control Deck, Smart Home and Original Apps on the right; Settings and Help in a fourth row
-   that scrolls into view. Check icons, labels, the selection stripe and the number shortcuts `1` to `8`.
-3. Open Original Apps. In the default build the tile reads `not set up` and opens a page that says what is
-   missing and which script sets it up (dual boot, docs/DUAL_BOOT.md); Back leaves, and nothing may pretend to
-   boot or connect. (The Linux, Control Deck and Smart Home tiles used to be greyed out too; they now open
-   module pages, checked in HV-31 to HV-35. The owner observation recorded for HV-29 was made on a build in which
-   all four were greyed out.)
+2. The first screen is Home, headed `OYSTER OS`, with a two-column tile grid: Security, Oyster AI and Red Team
+   on the left; Control, SmartHome and Original on the right; Scratchpad, Settings and Help in the rows below,
+   which scroll into view. Check icons, labels, the selection stripe and the number shortcuts `1` to `9`.
+3. Open Original. The tile reads `backup` (`on PC` when the dual-boot layout holds the original firmware) and
+   opens a page that says how to run the original firmware from the PC (docs/DUAL_BOOT.md); Back leaves, and
+   nothing may pretend to boot or connect.
 4. Check the Oyster AI tile against the backend state (connected, or unavailable with a reason).
 
-**Pass:** the splash appears without artefacts, waits for a key, Home is readable at 240x135, and the one unbuilt
-module (Original Apps) is visibly unavailable. Record anything clipped or hard to read, with photographs.
-
+**Pass:** the splash appears without artefacts, waits for a key, Home is readable at 240x135, and Original
+explains the PC restore without booting anything. Record anything clipped or hard to read, with photographs.
 
 ### HV-30 Start screen and G0 lock
 
@@ -335,8 +332,8 @@ authentication: any key opens it.
 
 ### HV-31 Hosts
 
-Home tile 3 ("Linux", the Hosts module, screens L10-L13). Written and host-tested (28 parser and text cases), never
-run on a Cardputer. Read-only: nothing is run on any host.
+Home tile 3 ("Linux", the Hosts module, screens L10-L13). Read-only: nothing is run on any host. This check
+needs a build whose Home screen has the Linux tile: where tile 3 is Red Team (HV-38), record it as `BLOCKED`.
 
 Prerequisites: the backend runs (`.\scripts\backend.ps1`), the device is provisioned and online (HV-10), and the
 backend PC is enrolled as a host that this device may see, for example
@@ -367,9 +364,8 @@ than a hang, no key runs anything on a host. Record failures with the text that 
 
 ### HV-32 Control Deck on the device
 
-Home tile 4 (screens D10, D11, D20, D21, D22). Written and host-tested (35 parser and text cases; 486 backend tests),
-never run on a Cardputer. Run this first with the default `OYSTER_DECK_EXECUTOR=mock`: nothing is executed on the PC,
-and every result says so. The real PC is HV-33.
+Home tile 4 (screens D10, D11, D20, D21, D22). Run this first with the default `OYSTER_DECK_EXECUTOR=mock`:
+nothing is executed on the PC, and every result says so. The real PC is HV-33.
 
 Prerequisites: backend running, device online, and the seed profile for the device:
 `python -m oyster.cli seed-demo --id <device-id>` (profile `desk`: 1 PC health, 2 Play/Pause, 3 Next, 4 Prev,
@@ -407,11 +403,9 @@ and a lost answer never creates a second job.
 
 ### HV-33 Control Deck on the real PC
 
-The backend part of the Control Deck acting on the PC it runs on (`executor_windows.py`). Only read-only probes have
-run on a real PC (host health, service state, a service name that does not exist); **media keys, the lock,
-Wake-on-LAN and service restart have only run against a fake OS layer.** Set `OYSTER_DECK_EXECUTOR=windows` in
-`backend/.env` and start the backend yourself in your own signed-in session, not elevated and not as a service
-(otherwise Windows reports `input_blocked`). Variables: `.env.example`.
+The backend part of the Control Deck acting on the PC it runs on (`executor_windows.py`). Set
+`OYSTER_DECK_EXECUTOR=windows` in `backend/.env` and start the backend yourself in your own signed-in session,
+not elevated and not as a service (otherwise Windows reports `input_blocked`). Variables: `.env.example`.
 
 1. **Health.** Slot 1 returns a summary such as `cpu 12% mem 63% disk 71%` that agrees with Task Manager. Jobs are
    labelled `executor: windows`.
@@ -434,8 +428,7 @@ service that is not allowlisted. Mark each action PASS, FAIL or BLOCKED separate
 
 ### HV-34 Smart Home: IR remote
 
-Home tile 5 > `IR Remote` (screens SH10-SH12). Written and host-tested (24 cases, shared with the Home Assistant
-parsers); **no IR code has been tried on a real TV and the IR LED pin is an assumption.** Needs no backend.
+Home tile 5 > `IR Remote` (screens SH10-SH12). Needs no backend.
 
 1. **Rooms and families.** Tile 5 opens the rooms list with `IR Remote` first; Enter lists `TV Samsung`, `TV LG`,
    `TV Sony`, `TV NEC (Toshiba type)`, `TV Philips (RC5)` and `About IR codes`; Enter on a family lists `1 Power`,
@@ -454,15 +447,13 @@ parsers); **no IR code has been tried on a real TV and the IR LED pin is an assu
    the rows.
 
 **Pass:** the LED flickers on a key press, at least one family drives the owner's TV (state which keys), one press is
-one burst, and the screen never claims more than `Sent`. A family that never reacts stays UNVERIFIED or FAIL for that
-TV; it does not make the module PASS by itself.
+one burst, and the screen never claims more than `Sent`. A family that never reacts is a `FAIL` for that TV; it
+does not make the module PASS by itself.
 
 ### HV-35 Smart Home with Home Assistant
 
-Home tile 5, Home Assistant rooms. The backend bridge is tested against a fake Home Assistant only (170 backend and
-24 host tests); **Home Assistant is not configured yet (no URL, no token) and nothing has run against a real
-instance.** Setup, allowlist and the full checklist: [`HOME_ASSISTANT.md`](HOME_ASSISTANT.md) (its items 1 and 2 are
-HV-34; items 3 to 6 are this check).
+Home tile 5, Home Assistant rooms. Setup, allowlist and the full checklist:
+[`HOME_ASSISTANT.md`](HOME_ASSISTANT.md) (its items 1 and 2 are HV-34; items 3 to 6 are this check).
 
 Part A, not set up (no `HOME_ASSISTANT_URL` or `HOME_ASSISTANT_TOKEN` in `backend/.env`):
 
@@ -485,16 +476,17 @@ Part B, a real instance (use a test light or switch first):
    `No answer; result unknown. Check it` and the action is not repeated by the device.
 5. The URL and the token appear nowhere: not on the screen, not in the serial log, not in `GET /v1/home/status`.
 
-**Pass:** Part A and every step of Part B behave as written. Until Part B has been run against a real instance, the
-Home Assistant half of this module stays UNVERIFIED even if Part A passes.
+**Pass:** Part A and every step of Part B behave as written. Part A alone does not pass the Home Assistant half of
+this module: that needs Part B against a real instance.
 
-### HV-24 to HV-26 (after M4 exists)
+### HV-24 to HV-26 (the M4 tests)
 
 These follow the reference demonstration in [`SETUP_WINDOWS.md`](SETUP_WINDOWS.md#10-full-demonstration-report-and-recovery):
 vulnerable vs corrected fixture, success after legitimate authorisation, a verified hash of the transferred
 object (compare with `.\scripts\fixture.ps1 synth`), interruption and recovery of a transfer, and the
-on-device confirmation for the virtual-LED write (including a timeout and a rejection). They stay
-**BLOCKED** until the M4 firmware is built.
+on-device confirmation for the virtual-LED write (including a timeout and a rejection). They need firmware
+that runs these operations on the device. A build that lists them under Security > Assess as "not in build"
+answers them with `unsupported`: record the three checks as `BLOCKED` on such a build.
 
 ### HV-36 Status LED
 
@@ -513,8 +505,7 @@ on-device confirmation for the virtual-LED write (including a timeout and a reje
 ### HV-37 Direct AI (Oyster AI without the backend)
 
 Oyster AI tile 2 answering a question with no laptop and no backend, by calling Groq directly over the
-device's own Wi-Fi (`firmware/src/direct_ai.cpp`, CA bundle `firmware/include/groq_ca.h`). The wire format
-has 16 host tests; the live request was **seen working on 2026-10-27** (Results: HV-37). A key must be stored
+device's own Wi-Fi (`firmware/src/direct_ai.cpp`, CA bundle `firmware/include/groq_ca.h`). A key must be stored
 first (`SET-AI-KEY`, loaded from `backend/.env` by `oyster-up`, or `provision-device --ai-key-file`).
 
 1. With the backend running, tile 2 reads `Oyster AI`. Stop the backend (`.\scripts\oyster-up.ps1 -Stop`) and
@@ -530,8 +521,8 @@ first (`SET-AI-KEY`, loaded from `backend/.env` by `oyster-up`, or `provision-de
 6. Voice (tile 2, `Ask a question (voice)`) still reports the backend is needed while offline: direct mode is
    text Q&A only.
 
-**Pass:** steps 1 to 6 behave as written and no key or token is ever shown. Step 2 passed on 2026-10-27
-with the bundled EC chain (WE1 -> GlobalSign ECC Root CA - R4). If Groq changes its chain and step 2
+**Pass:** steps 1 to 6 behave as written and no key or token is ever shown. `groq_ca.h` bundles the EC
+chain WE1 -> GlobalSign ECC Root CA - R4. If Groq changes its chain and step 2
 fails with a certificate error, swap the new root into `groq_ca.h` or store it in LittleFS. A
 "check the CA bundle" message can also mean the TLS handshake ran out of internal RAM (the hardware SHA
 engine logs `Failed to allocate buf memory`); check free heap before blaming the certificate.
@@ -539,8 +530,7 @@ engine logs `Failed to allocate buf memory`); check free heap before blaming the
 ### HV-38 Scripts (Red Team tile, PikaPython)
 
 Home tile 3 ("Red Team") running a `.py` file from `/oyster/scripts` on the SD card through the vendored
-PikaPython interpreter. Details and the bound `Oyster` module: [`SCRIPTS.md`](SCRIPTS.md). **Unverified**
-until run on a real device.
+PikaPython interpreter. Details and the bound `Oyster` module: [`SCRIPTS.md`](SCRIPTS.md).
 
 1. With no SD card: tile 3 lists `About / Evil-M5 reference` and `Run example (built-in)`. The first opens
    the reference text; the second runs the compiled-in example and shows its log, with no SD card.
@@ -566,10 +556,10 @@ until run on a real device.
    a clear "too large" message and never partially runs.
 6. `wifi_ap_count()` reports 0 before any Wi-Fi survey has completed this boot, and the real count after
    one has (Security > Wi-Fi Survey), without the script itself ever starting a scan.
-7. RAM/flash headroom after adding this module (`pio run -e cardputer-adv-dualboot`; compare against the
-   figure recorded the same day in this file's earlier checks) stays within the project's usual budget.
+7. RAM/flash headroom with this module (`pio run -e cardputer-adv-dualboot`; compare the RAM and flash
+   percentages it prints with [`BUILD_MATRIX.md`](BUILD_MATRIX.md)) stays within the project's usual budget.
 
 **Pass:** steps 1 to 7 behave as written, and nothing it does ever requires the backend or the laptop.
 A crash is possible in principle (the vendored interpreter's internal consistency checks call `abort()`
-on a genuine invariant violation, same as any other firmware crash path) but has not been seen; if one
+on a genuine invariant violation, same as any other firmware crash path); if one
 occurs, it is a device reset, not a hang, and the next boot behaves normally.

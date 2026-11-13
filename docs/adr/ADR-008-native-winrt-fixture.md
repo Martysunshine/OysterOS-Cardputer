@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-008
+
 # ADR-008: Live GATT fixture uses the native WinRT API, not Bless
 
 **Status:** accepted (2026-10-24)

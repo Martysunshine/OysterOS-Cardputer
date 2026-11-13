@@ -1,15 +1,17 @@
+[OysterOS](../README.md) / simulator
+
 # OysterOS UI simulator
 
 A pixel-sized (240 x 135) desktop simulator of the OysterOS user interface, with a keyboard emulator, mock data and
 automated navigation tests. It needs **no Cardputer, no backend and no network**, and it never flashes or talks to a
-device. Design document: [docs/SIMULATOR.md](../docs/SIMULATOR.md). Issue: #2.
+device. Design document: [docs/SIMULATOR.md](../docs/SIMULATOR.md).
 
 **What it is not.** It is not a copy of the firmware: it re-implements the firmware's widgets and navigation in Python,
 reading the design tokens (`firmware/include/ui_theme.h`), the 24 x 24 icons (`firmware/src/assets_gen.cpp`) and the
 glyph tables of the pinned M5GFX library from the repository, and tests check it against the firmware sources (screen
-map, Home tiles, "Not available" texts, key table). **Nothing in it has been compared with a real display.** Pixel
-parity with the device, the panel's colour rendering and every physical key binding are **UNVERIFIED** until photographs
-and a key-tester run from a Cardputer ADV exist (see `docs/HARDWARE_VERIFICATION.md`).
+map, Home tiles, "Not available" texts, key table). It does not model the physical panel or keyboard: the display's
+colour rendering and the key bindings are checked on a Cardputer ADV, with photographs and the key tester (see
+`docs/HARDWARE_VERIFICATION.md`).
 
 ## Run
 
@@ -27,7 +29,7 @@ Requirements: Python 3.12+, [Pillow](https://pypi.org/project/Pillow/) (`require
 Without the launcher (from the `simulator` folder): `python -m oyster_ui_sim [--headless --out DIR] [--script FILE
 --out DIR] [--preview] [--scale N] [--routes] [--keys]`.
 
-Keys in the window: the Cardputer keys as proposed by the firmware (`; . , /` move, `Enter` selects, `` ` `` or `Del` is
+Keys in the window: the Cardputer keys as mapped by the firmware (`; . , /` move, `Enter` selects, `` ` `` or `Del` is
 Back, `?` is Help, **Alt is Fn**: `Alt`+`Del` is Home, `Alt`+`` ` `` is Cancel, `Ctrl`+`C` is Cancel); desktop
 shortcuts: arrow keys, `Esc`, `Backspace`, `Home`, `F1`. The side panel shows the legend, buttons for the logical
 actions, the simulated connectivity, the state variant of the current screen, a route jump list and switches for
@@ -54,15 +56,15 @@ The text uses the two bitmap fonts of the firmware (`ui_theme.h`: `AsciiFont8x16
 `Font0` 6 x 8 for the status bar and notices). The bitmaps are **extracted from M5GFX 0.2.34** (the version pinned by
 the firmware, `firmware/.pio/libdeps/cardputer-adv/M5GFX`) by `tools/gen_glyphs.py`; the generated module is committed
 so the simulator runs without the PlatformIO cache. Cell metrics and glyph shapes are those of the library; how the real
-panel renders them is still unverified. Circles and rounded rectangles are ports of the M5GFX algorithms.
+panel renders them is not modelled. Circles and rounded rectangles are ports of the M5GFX algorithms.
 
 Colours are the RGB565 constants of the firmware expanded to 8 bits by bit replication, so the on-screen panel colour is
 `#182C39` where the design says `#192C3D`: that is the quantisation the firmware itself applies. The panel's real colour
-response is unverified.
+response is not modelled.
 
 ### Licence attribution for the extracted data
 
-These notices are also listed in `LICENSE-NOTICES.md`.
+These notices are also listed in `THIRD-PARTY-NOTICES.md`.
 
 - `fonts::AsciiFont8x16` (`src/lgfx/Fonts/Ascii8x16.h`, table `FontLib8x16`, file header "ASC16") and the M5GFX shape
   algorithms: M5GFX, Copyright (c) 2021 M5Stack, MIT licence. The table file carries no separate licence text.

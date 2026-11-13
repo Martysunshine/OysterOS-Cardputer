@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-009
+
 # ADR-009: Dual boot with the original firmware (two OTA slots)
 
 **Status:** **rejected (2026-10-26) for the in-device boot; superseded by a PC full-image restore.** The

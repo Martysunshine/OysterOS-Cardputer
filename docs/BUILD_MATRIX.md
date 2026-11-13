@@ -1,13 +1,14 @@
+[OysterOS](../README.md) / [Docs](README.md) / Build matrix
+
 # Build matrix
 
-Every version that a build depends on, pinned. Do not use floating versions or branches in release builds
+Every version that a build depends on, pinned. Do not use floating versions or branches in release builds.
 Any dependency change is recorded here in the same change.
 Decision record: [ADR-001](adr/ADR-001-firmware-toolchain.md).
 
-Status: these pins come from `firmware/platformio.ini` and `constraints.txt`. The "Resolved" column was read
+These pins come from `firmware/platformio.ini` and `constraints.txt`. The "Resolved" column was read
 from the installed package metadata (`~/.platformio/packages/*/package.json`,
-`firmware/.pio/libdeps/cardputer-adv/*/.piopm`) on 2026-10-24. **Hardware bring-up with this combination has
-not happened yet** (no Cardputer attached).
+`firmware/.pio/libdeps/cardputer-adv/*/.piopm`) on 2026-10-24.
 
 ## Firmware: device build (`env:cardputer-adv`)
 
@@ -49,7 +50,7 @@ Board and build settings (`firmware/platformio.ini`):
 | NimBLE roles | central + observer only; peripheral and broadcaster off; 1 connection; 4 bonds; 8 CCCDs; C++ wrapper log level 1 |
 | Firmware version | `OYSTER_FIRMWARE_VERSION="0.1.0"` |
 | Monitor | 115200 baud, `esp32_exception_decoder` |
-| Upload speed | 921600 |
+| Upload speed | 115200 (the native USB port ignores the UART rate) |
 
 ## Firmware: host unit tests (`env:native`)
 
@@ -58,7 +59,7 @@ Board and build settings (`firmware/platformio.ini`):
 | PlatformIO `native` platform | 1.2.1 |
 | Test framework | Unity 2.6.1 |
 | Host compiler | GCC 16.2.0 from WinLibs (`x86_64-ucrt-posix-seh`, build r3), winget id `BrechtSanders.WinLibs.POSIX.UCRT`, installed with `--source winget` |
-| Flags | `-std=gnu++17 -DOYSTER_HOST_TEST -Wall -Wextra`; M5/NimBLE/ArduinoJson ignored (`lib_ignore`) |
+| Flags | `-std=gnu++17 -DOYSTER_HOST_TEST -Wall -Wextra`; M5 and NimBLE libraries ignored (`lib_ignore`); ArduinoJson 7.4.3 is the only library dependency |
 
 `scripts\_env.ps1` puts the WinLibs `mingw64\bin` folder on `PATH` when it finds it under
 `%LOCALAPPDATA%\Microsoft\WinGet\Packages` (or `OYSTER_GCC_BIN`).
@@ -81,7 +82,7 @@ End of the last partition: `0x800000` = 8 MiB.
 ## Binary size
 
 Measured in clean builds of `env:cardputer-adv` on a Windows host on 2026-10-25 (PlatformIO 6.2.0, no compiler
-warnings). These are **build measurements, not hardware results**: nothing has run on a device.
+warnings). Except for the heap row, these are **build measurements, not hardware results**.
 
 With the Hosts, Control Deck and Smart Home modules (and the module framework) the firmware is **about** 33.2 % of the
 5 MiB factory partition (flash) and **about** 42.6 % static RAM. The module state is static: about 5.8 KB of `.bss`
@@ -93,7 +94,7 @@ earlier clean build, before those modules; run `scripts/firmware-build.ps1` for 
 | `firmware.bin` size | 1673616 bytes |
 | Share of the 5 MiB factory partition | 31.9% (1,673,257 bytes of 5,242,880 reported by PlatformIO) |
 | Static RAM (`.data` + `.bss`) | 38.1%: 124,952 of 327,680 bytes |
-| Heap left at boot, minimum free heap, largest free block | **Not measured.** The project goals (>= 64 KiB / >= 32 KiB) are checked from the on-device telemetry; see HARDWARE_VERIFICATION.md |
+| Heap left at boot, minimum free heap, largest free block | Measured on the device on 2026-10-27, at idle with Wi-Fi up: about 56 KiB free heap, largest free block about 47 KiB. The project goals (>= 64 KiB / >= 32 KiB) are checked from the on-device telemetry; see HV-18 in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md) |
 | `firmware.bin` SHA-256 (of that earlier build; the module build has another) | `edf4f78fbbff17b1c8298b79a01fd6fc9eefb07a3187020dc9d804ec402f36a9` |
 | Host tests (`pio test -e native`) | 173 cases pass in the core and input suites (core logic, delivery/ledger rules, identity, paging, input mapping incl. Home/Help); the modules add their own suites: `test_hosts` 28 cases, `test_deck` 35, `test_smarthome` 24 |
 | Backend and tool tests (`pytest tests`) | 1958 passed, 3 skipped at the time of writing; among them `tests/deck` 486, `tests/home` 170 and `tests/simulator` 165 |

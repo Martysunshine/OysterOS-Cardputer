@@ -1,3 +1,5 @@
+[OysterOS](../README.md) / [Docs](README.md) / Screen map
+
 # UI screen map: OysterOS design IDs to firmware screens
 
 This table links the mockup screen IDs of the [UI/UX Design System](DESIGN_SYSTEM.md) (and the wireframes in

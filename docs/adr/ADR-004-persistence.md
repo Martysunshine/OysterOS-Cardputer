@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-004
+
 # ADR-004: Backend persistence and admin surface
 
 **Status:** accepted (2026-10-24)

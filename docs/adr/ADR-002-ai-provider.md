@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-002
+
 # ADR-002: AI provider adapter
 
 **Status:** accepted (2026-10-24)

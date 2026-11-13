@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-010
+
 # ADR-010: Web access for the assistant (web_search, web_fetch)
 
 **Status:** proposed (2026-10-26). Becomes accepted when a run with `AI_WEB_ACCESS=on` has been tried against

@@ -1,3 +1,5 @@
+[OysterOS](../README.md) / [Docs](README.md) / Hardware audit template
+
 # Cardputer ADV Firmware Preservation Audit
 
 **Do not commit device credentials, raw flash images or personal network data.**

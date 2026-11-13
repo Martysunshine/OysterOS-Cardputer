@@ -1,3 +1,5 @@
+[OysterOS](../../README.md) / [Docs](../README.md) / ADR-003
+
 # ADR-003: Transport, TLS and time bootstrap
 
 **Status:** accepted (2026-10-24)
@@ -28,5 +30,4 @@ The clock gate above is therefore a firmware *policy* (needed for evidence times
 before time is known), not something the TLS library enforces. Mitigations in this design: the device
 trusts only the owner's private CA (never a public bundle); revocation = re-provision a new CA; keep the
 CA key only on the backend PC. Fixing it properly needs a rebuilt mbedTLS (custom ESP-IDF build or a
-firmware-side X.509 date check on the peer certificate) and is out of scope for v1; it is listed as a
-known limitation in `docs/CAPABILITY_MATRIX.md`.
+firmware-side X.509 date check on the peer certificate) and is out of scope for v1.

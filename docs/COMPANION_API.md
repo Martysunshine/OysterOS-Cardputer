@@ -1,13 +1,13 @@
-# Companion API: pairing and read-only host health (Issue #3)
+[OysterOS](../README.md) / [Docs](README.md) / Companion API
 
-Status: **implemented and tested against the mock adapter and a read-only `local` adapter** (this PC, through
-psutil; see "Adapters"). The package is `backend/oyster/companion/`. There is no remote (SSH) adapter and no
-other machine has been read. The `local` adapter's tests use a fake psutil except one that reads the real
-machine and only checks types and ranges. A firmware client exists (the Hosts module,
-`firmware/src/modules/hosts.cpp`); it compiles and its parsers have host tests, but **nothing has run on the
-Cardputer** against this API yet. It implements the P1 item "typed authenticated API, pairing, `/health` and
-`/hosts` health, only authorized host metrics, no arbitrary remote shell execution" from the design plan
-(sections 5 and 6) and milestone M4 of [`DEVELOPMENT_ROADMAP.md`](DEVELOPMENT_ROADMAP.md).
+# Companion API: pairing and read-only host health
+
+The package is `backend/oyster/companion/`. It has two adapters: a mock and a read-only `local` adapter (this
+PC, through psutil; see "Adapters"). There is no remote (SSH) adapter. The firmware client is the Hosts
+module (`firmware/src/modules/hosts.cpp`, parsers in `oyster_core/hosts_json.*`). The API implements the item
+"typed authenticated API, pairing, `/health` and `/hosts` health, only authorized host metrics, no arbitrary
+remote shell execution" from the design plan ([`OysterOS_Project_Plan.md`](OysterOS_Project_Plan.md),
+sections 5 and 6).
 
 It extends the backend described in [`API.md`](API.md): same bearer tokens, same error body
 (`{"error","detail"}`), same 401 / 403 / 404 / 429 meanings, same 4 KiB device bodies.
@@ -33,8 +33,8 @@ install(app)          # after create_app(...); safe to call twice
 
 `GET /v1/health` (unauthenticated, `{"status":"ok","api":"v1"}`) is unchanged and not redefined. It tells a
 client that the backend is up. The companion adds `GET /v1/hosts` and `GET /v1/hosts/{id}/health`, which are the
-*hosts'* health and always need a device token. The design plan's richer `/v1/health` (version, capabilities)
-is not implemented; the device reports its own capabilities per session.
+*hosts'* health and always need a device token. `/v1/health` carries no version or capability fields; the
+device reports its own capabilities per session.
 
 ## Endpoints
 
@@ -124,7 +124,7 @@ Append-only table `audit` in `companion.db`: `id`, `ts`, `actor` (`owner`, `devi
 (including denied reads of unknown or foreign ids). Callers pass identifiers only; every field is reduced to a
 short constrained string, so neither the code, the token nor adapter error text can enter it. No statement
 in the package updates or deletes an audit row, and database triggers abort any attempt. Retention is unbounded
-in this version (a health poll adds one row per read); rotation is a known gap.
+(a health poll adds one row per read); there is no rotation.
 
 ## Storage
 
@@ -166,8 +166,6 @@ adapter is read-only and supports every requested metric, and every other guaran
 not interruptible: the API stops waiting after 5 s, but the pool thread stays busy until the call returns (the
 pool has 4 threads).
 
-Verified on a Windows 11 PC only (values in range, services `running`/`stopped`/missing); never on Linux or macOS.
-
 ### Seeding the local PC
 
 `oyster.companion.seed.ensure_local_host(store_or_registry, device_ids, host_id="this-pc", display_name="This PC",
@@ -195,11 +193,11 @@ must guarantee, and document here:
 Adding an adapter kind means extending `AdapterKind` in `models.py` and the factory in `adapters.py`; until
 then enrolment accepts `"mock"` and `"local"` only.
 
-## Issue requirement to endpoint, module and test
+## Requirement to endpoint, module and test
 
 All tests are in `tests/companion/` and run without network, with an injected clock and RNG.
 
-| Issue requirement | Endpoint / module | Tests |
+| Requirement | Endpoint / module | Tests |
 | --- | --- | --- |
 | Typed API | `models.py`: every model `extra="forbid"`, bounded strings and lists | `test_companion_safety::test_every_model_forbids_extra_fields_and_has_no_command_like_field`, `test_companion_hosts::test_enrol_rejects_bad_requests`, `::test_enrol_rejects_non_objects_and_oversized_bodies`, `test_companion_pairing::test_redemption_validates_its_body` |
 | Authenticated | `oyster.auth` dependencies on every route except `POST /v1/pair` | `test_companion_auth::test_missing_or_invalid_token_is_401`, `::test_owner_routes_refuse_a_device_token`, `::test_device_routes_refuse_the_owner_token`, `::test_authentication_happens_before_the_body_is_read`, `::test_a_revoked_device_token_stops_working`, `::test_device_app_serves_no_owner_routes` |
@@ -217,13 +215,10 @@ All tests are in `tests/companion/` and run without network, with an injected cl
 
 Run them with `python -m pytest tests/companion -o addopts="" -q -p no:cacheprovider`.
 
-## Known gaps
+## Limits
 
-- The only real host ever read is the PC the backend runs on (`local` adapter, Windows 11, psutil 7.2); adapter
-  timeouts for remote hosts, SSH host-key handling and least-privilege accounts are unproven. The `local`
-  adapter has no timeout of its own for a hung operating-system call.
-- The firmware Hosts module (`firmware/src/modules/hosts.cpp`) has not run on the Cardputer, and there is no
-  on-device pairing screen.
+- Only the PC the backend runs on can be read (`local` adapter). The `local` adapter has no timeout of its own
+  for a hung operating-system call.
 - `GET /v1/hosts/{id}/logs`, services control and any action job are out of scope (read-only metrics only); the
   device's Logs page says so instead of showing anything.
 - Audit retention is unbounded; there is no rotation or export. A device that polls health adds a row per read.

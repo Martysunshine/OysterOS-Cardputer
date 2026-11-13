@@ -1,17 +1,19 @@
+[OysterOS](../README.md) / [Docs](README.md) / Dual boot
+
 # Dual boot with the original firmware
 
-> **Finding (2026-10-26, tested on the real device): in-device dual boot of the original DOES NOT WORK here.**
+> **In-device dual boot of the original firmware does not work.**
 > The original firmware was built with ESP-IDF 5.4.2; Oyster's bootloader is the Arduino core's ESP-IDF 4.4.7.
 > A 4.x second-stage bootloader cannot load a 5.x app, so selecting `ota_1` resets immediately and the
-> rollback returns to Oyster (confirmed by booting `ota_1` directly: the device came straight back to Oyster).
+> rollback returns to Oyster (booting `ota_1` directly brings the device straight back to Oyster).
 > Two firmwares built on different IDF major versions need different bootloaders, and the chip has one
 > bootloader slot. **The original is therefore run by restoring the full factory image from the PC**
 > (`scripts/original-restore.ps1`), which brings its own bootloader; returning to Oyster is
-> `scripts/firmware-flash.ps1`. The "Original Apps" tile now explains this and never attempts the boot.
-> The `ota_0`/`ota_1` layout below still describes how the original app is kept on the flash for reference;
-> the boot-selector part (`esp_ota_set_boot_partition`, rollback) is retained only as history.
+> `scripts/firmware-flash.ps1`. The "Original Apps" tile explains this and never attempts the boot.
+> The `ota_0`/`ota_1` layout below describes how the original app is kept on the flash for reference;
+> the boot-selector part (`esp_ota_set_boot_partition`, rollback) documents the mechanism only: the firmware
+> never selects `ota_1`.
 
-**Status: the layout and scripts are tested on the PC; the in-device boot was tested and does not work (above).**
 Decision record: [`adr/ADR-009-dual-boot-original-firmware.md`](adr/ADR-009-dual-boot-original-firmware.md).
 
 ## Running the original firmware (the supported way)
@@ -28,9 +30,9 @@ the original runs, a restart does **not** return to Oyster; re-flash Oyster to c
 
 The default build (`env:cardputer-adv`) is a single-slot image that replaces the original firmware; the Home tile
 "Original Apps" is then only a message. The dual-boot build (`env:cardputer-adv-dualboot`) keeps **Oyster in
-`ota_0` and the original firmware in `ota_1`**. Home > 6 Original Apps shows what is in `ota_1` and, after a
-confirmation, restarts into it. The default env and its partition file are unchanged; switching a device to
-dual boot is a deliberate step (below).
+`ota_0` and the original firmware in `ota_1`**. Home > 6 Original Apps shows what is in `ota_1` and how to
+run it from the PC; it never restarts into it. The default env and its partition file are unchanged; switching
+a device to dual boot is a deliberate step (below).
 
 ## Layout
 
@@ -54,8 +56,9 @@ upload writes `boot_app0.bin`; the new table moves `nvs` below it.
 
 1. `boot_app0.bin` (written by every upload) holds one valid otadata entry, sequence 1, which selects the first
    OTA slot: `ota_0`. Oyster therefore has to live in `ota_0`.
-2. Original Apps calls `esp_ota_set_boot_partition(ota_1)`. That verifies the image in `ota_1` (checksum and
-   SHA-256), writes a new otadata entry (sequence 2, state NEW) into the other otadata sector and the UI restarts.
+2. A switch to the original calls `esp_ota_set_boot_partition(ota_1)`. That verifies the image in `ota_1`
+   (checksum and SHA-256) and writes a new otadata entry (sequence 2, state NEW) into the other otadata sector;
+   a restart follows.
 3. The bootloader selects the entry with the larger sequence, changes its state to PENDING_VERIFY and boots
    `ota_1`.
 4. If the original firmware does **not** mark itself valid and the device resets for any reason (power cycle, reset
@@ -122,19 +125,20 @@ the flash script (`-SkipBackupCheck` overrides), reads otadata and writes nothin
 - **Two firmwares share `nvs`.** Oyster uses the namespace `oyster`; a factory reset in the original may erase it.
 - **Bootloader mismatch.** The bootloader is the Arduino one (ESP-IDF 4.4.7); the original is an ESP-IDF 5.4.2
   build (on the unit this was prepared on). The header fields the bootloader checks (chip id, revision range) raise
-  no conflict when read against its code, but that is not a boot.
+  no conflict, but a 4.x bootloader cannot load the 5.x app: this is why the original does not boot from `ota_1`
+  (top of this page).
 - The setup writes into flash that the old layout still uses (see "Order"). With a verified backup nothing is
   unrecoverable; without one `dualboot-setup.ps1` refuses.
 
-## What is verified (on the PC)
+## What the PC-side checks cover
 
 - The CSV passes ESP-IDF's `gen_esp32part.py` for an 8 MB flash (no overlaps, alignment, size); `ota_0` has
   more than 2x headroom over the current image; `ota_1` is larger than the original app; `otadata` is at 0xE000 where
   PlatformIO writes `boot_app0.bin`, which is exactly as long as `otadata` and selects `ota_0`
   (`tests/scripts/test_dualboot_layout.py`).
-- On the owner's real backup: the factory app is at 0x10000 in a 4 MiB slot, ESP-IDF 5.4.2, about 2.5 MiB used,
+- On a real factory backup: the factory app is at 0x10000 in a 4 MiB slot, ESP-IDF 5.4.2, about 2.5 MiB used,
   everything after it blank; the script's cut equals an independent Python cut byte for byte (same SHA-256).
-- The firmware compiles for both envs without warnings; in the default env Original Apps just reports "not set up".
+- The firmware compiles for both envs without warnings; in the default env Original Apps points to the PC backup.
 - The rollback chain was **read from the compiled code** of the pinned Arduino framework (disassembly, not a
   run): the bootloader turns NEW into PENDING_VERIFY on the first boot of an entry and PENDING_VERIFY into ABORTED
   on the next boot, entries in state INVALID or ABORTED are not selected, and `esp_ota_set_boot_partition` in the
@@ -142,21 +146,3 @@ the flash script (`-SkipBackupCheck` overrides), reads otadata and writes nothin
   `CONFIG_APP_ROLLBACK_ENABLE` in the framework's sdkconfig, so a framework upgrade cannot drop them silently.
 - `dualboot-setup.ps1 -DryRun`, `oyster-return.ps1 -DryRun` and `firmware-flash.ps1 -Env ... -DryRun` run clean
   without hardware.
-
-## What is not verified (needs the device)
-
-1. That the original firmware **boots from `ota_1`** under the Arduino bootloader with this table.
-2. That **rollback returns to Oyster** on a reset, i.e. that the original does not mark itself valid. Unknown until
-   tried; `oyster-return.ps1` exists because of it.
-3. The esptool commands of both scripts against a real chip: `write_flash`/`verify_flash` at 0x3B0000, the
-   `--after watchdog_reset` restart, USB re-enumeration, and reaching a running original over the native USB port.
-4. How long the image check inside `esp_ota_set_boot_partition` blocks the UI (it reads the whole slot) and how the
-   switching and confirmation pages look on the display.
-5. Whether the original uses `phy_init`, NVS contents or the OTA slots in a way that breaks here.
-6. The whole procedure on a second unit.
-
-Device checklist to record in `HARDWARE_VERIFICATION.md`: (a) `dualboot-setup.ps1 -Apply` then `-Apply` again
-(second run writes nothing); (b) dual-boot flash and provisioning; Original Apps shows project and version and
-`ready` on the Home tile; (c) Enter shows the confirmation, Back rejects, Enter approves and the device restarts;
-(d) the original's screen appears; (e) a power cycle brings Oyster back; (f) if (e) fails, `oyster-return.ps1`
-brings it back; (g) a full restore of the backup in download mode.

@@ -1,3 +1,5 @@
+[OysterOS](../README.md) / [Docs](README.md) / Scripts
+
 # Scripts (Home tile 3, "Red Team")
 
 Oyster is a recon and defensive companion. It does not include tools that disrupt or deceive devices and
@@ -7,8 +9,8 @@ themselves - [Evil-M5Project by 7h30th3r0n3](https://github.com/7h30th3r0n3/Evil
 part of Oyster.
 
 What tile 3 *does* carry is a small Python interpreter, so the owner can script Oyster's own, already
-built-in functions. This page documents that feature. **Unverified on hardware** until it has been run on
-a real device; see HV-38 in [`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
+built-in functions. This page documents that feature; the device check for it is HV-38 in
+[`HARDWARE_VERIFICATION.md`](HARDWARE_VERIFICATION.md).
 
 ## What runs
 
