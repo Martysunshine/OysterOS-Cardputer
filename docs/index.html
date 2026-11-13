@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OysterOS - a pocket operating system for the Cardputer ADV</title>
+<meta name="description" content="OysterOS turns the M5Stack Cardputer ADV into a pocket computer: Wi-Fi and Bluetooth recon, an AI assistant over its own Wi-Fi, smart-home and PC control, Python on the device. Try the firmware's UI live in your browser.">
+<meta property="og:title" content="OysterOS - a pocket operating system for the Cardputer ADV">
+<meta property="og:description" content="Recon, an AI assistant, smart-home and PC control and Python scripting on a keyboard handheld. Try it live in your browser.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="site/mascot.png">
+<style>
+  :root {
+    color-scheme: dark;
+    --navy: #101923; --deep: #0b1119; --ink: #efe9ff; --muted: #b9b4da;
+    --seafoam: #5eead4; --lilac: #b79cff; --line: #2c2f5e; --card: #151b33;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--deep); color: var(--ink);
+    font: 17px/1.6 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  }
+  a { color: var(--seafoam); }
+  .wrap { width: min(1080px, 100% - 32px); margin-inline: auto; }
+
+  header {
+    background: linear-gradient(180deg, rgba(11, 17, 25, 0) 55%, var(--deep) 100%), url("site/backdrop.png") center / cover no-repeat, var(--navy);
+    text-align: center; padding: 56px 0 72px;
+  }
+  .mascot { width: 168px; height: auto; filter: drop-shadow(0 12px 34px rgba(143, 107, 255, 0.55)); }
+  .wordmark { display: block; width: min(520px, 86%); height: auto; margin: -18px auto 0; }
+  h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .tagline { font-size: clamp(1.15rem, 2.6vw, 1.5rem); margin: 4px auto 0; max-width: 34ch; text-wrap: balance; }
+  .kicker {
+    font: 600 0.78rem/1 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: 0.22em;
+    color: var(--seafoam); margin: 18px 0 0; text-transform: uppercase;
+  }
+  .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+  .btn {
+    display: inline-block; padding: 13px 24px; border-radius: 999px; text-decoration: none; font-weight: 650;
+    border: 1.5px solid var(--seafoam); color: var(--seafoam); transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .btn.primary { background: var(--seafoam); color: #06231f; }
+  .btn:hover, .btn:focus-visible { transform: translateY(-2px); }
+  .btn:focus-visible { outline: 3px solid var(--lilac); outline-offset: 3px; }
+
+  section { padding: 44px 0; }
+  h2 { font-size: clamp(1.4rem, 3vw, 1.9rem); margin: 0 0 6px; text-wrap: balance; }
+  .lead { color: var(--muted); margin: 0 0 22px; max-width: 68ch; }
+
+  .stage { border: 1.5px solid var(--line); border-radius: 22px; overflow: hidden; background: var(--navy); box-shadow: 0 30px 80px rgba(8, 4, 30, 0.6); }
+  .stage iframe { display: block; width: 100%; height: clamp(640px, calc(78vw + 200px), 1020px); border: 0; }
+  .hint { color: var(--muted); font-size: 0.92rem; margin: 12px 4px 0; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .card { background: linear-gradient(160deg, #1b1446, var(--card) 60%, var(--navy)); border: 1.5px solid var(--line); border-radius: 18px; padding: 20px 22px 22px; }
+  .card img { width: 84px; height: 84px; margin: -6px 0 2px -8px; }
+  .card h3 { margin: 0 0 6px; font-size: 1.08rem; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.96rem; }
+
+  footer { border-top: 1.5px solid var(--line); padding: 26px 0 40px; color: var(--muted); font-size: 0.92rem; text-align: center; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn { transition: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <img class="mascot" src="site/mascot.png" alt="The OysterOS mascot: a smiling pearl in a purple oyster shell" width="320" height="320">
+    <h1>OysterOS</h1>
+    <img class="wordmark" src="site/wordmark.png" alt="OysterOS" width="720" height="197">
+    <p class="tagline">A pocket operating system for security, AI and automation.</p>
+    <p class="kicker">M5Stack Cardputer ADV / ESP32-S3 / C++ and Python</p>
+    <div class="cta">
+      <a class="btn primary" href="#live">Try it live</a>
+      <a class="btn" href="https://github.com/Martysunshine/OysterOS">Source on GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="live">
+    <div class="wrap">
+      <h2>The firmware's interface, running in your browser</h2>
+      <p class="lead">This is a port of the device's own drawing code, with its fonts, icons and colours. Click the Cardputer, then press its keys or use your keyboard: <b>; . , /</b> move, <b>Enter</b> opens, <b>1</b>-<b>9</b> jump to a tile.</p>
+      <div class="stage">
+        <iframe src="emulator/index.html" title="OysterOS emulator: a drawn Cardputer ADV you can operate" loading="lazy"></iframe>
+      </div>
+      <p class="hint">Prefer a full page? <a href="emulator/index.html">Open the emulator on its own</a>.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>What makes it different</h2>
+      <p class="lead">OysterOS treats a keyboard handheld with 8 MB of flash as a real computer, with apps, an assistant, a safety model and a test suite, and makes it the hands of an AI agent.</p>
+      <div class="grid">
+        <div class="card"><img src="site/emblem-ai.png" alt="" width="200" height="200"><h3>AI with no phone or laptop</h3><p>The device joins Wi-Fi on its own, keeps its key in internal storage and opens the TLS connection itself.</p></div>
+        <div class="card"><img src="site/emblem-confirm.png" alt="" width="200" height="200"><h3>A physical safety catch</h3><p>The model can only request typed tools. Anything that changes state waits for a key press on the device.</p></div>
+        <div class="card"><img src="site/emblem-recon.png" alt="" width="200" height="200"><h3>Recon that is safe by design</h3><p>Passive Wi-Fi survey, Bluetooth LE discovery and inspection of devices you enrolled. Nothing that disturbs others.</p></div>
+        <div class="card"><img src="site/emblem-home.png" alt="" width="200" height="200"><h3>Home and PC on nine keys</h3><p>An infrared remote, Home Assistant behind an allowlist and a shortcut deck for your PC, with an audit log.</p></div>
+        <div class="card"><img src="site/emblem-scripts.png" alt="" width="200" height="200"><h3>Python on the device</h3><p>A sandboxed interpreter runs scripts from the SD card. File hooks fail closed and sleeps are capped.</p></div>
+        <div class="card"><img src="site/emblem-engineering.png" alt="" width="200" height="200"><h3>Engineered like a product</h3><p>About 2,500 automated tests, a simulator checked against the firmware and written architecture decisions.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    Open source under the MIT licence. <a href="https://github.com/Martysunshine/OysterOS#run-it-yourself">Run it yourself</a> ·
+    <a href="https://github.com/Martysunshine/OysterOS/tree/main/docs">Documentation</a><br>
+    Created by martin.matysek
+  </div>
+</footer>
+
+</body>
+</html>
