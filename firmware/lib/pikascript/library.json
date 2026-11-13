@@ -1,7 +1,7 @@
 {
   "name": "pikascript",
-  "version": "1.13.4",
-  "description": "Vendored PikaPython (MIT) core interpreter, plus the generated bindings for Oyster's own script-facing module. See assets/PROVENANCE.md and docs/SCRIPTS.md. Nothing in this library is hand-written except Oyster_Oyster.c.",
+  "version": "1.14.0",
+  "description": "Vendored PikaPython (MIT) core interpreter, plus the generated bindings for Oyster's own script-facing module. Licence: LICENSE in this folder and THIRD-PARTY-NOTICES.md at the repository root; usage: docs/SCRIPTS.md. Nothing in this library is hand-written except Oyster_Oyster.c.",
   "frameworks": "*",
   "platforms": "*",
   "build": {"flags": ["-std=gnu17", "-DPIKA_FREERTOS_ENABLE=1"], "includeDir": "include", "srcDir": "src"}

@@ -1,0 +1,21 @@
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{cpp,h,hpp,c,ino}]
+indent_size = 2
+
+[*.{json,yml,yaml,html,css,js,svg}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = 110
+
+[*.{ps1,psm1}]
+indent_size = 4

@@ -1,0 +1,49 @@
+# Secrets and local configuration - never commit these
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.token
+*.sealed
+
+# Local data written by the backend and the lab tools
+backend/data/
+lab/data/
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+provider_check.json
+*.raw.jsonl
+*.log
+
+# Flash backups of your own device (they contain the factory firmware) and SD card dumps
+_backups/
+sd-dumps/
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# PlatformIO
+.pio/
+compile_commands.json
+
+# Generated output
+out/
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store

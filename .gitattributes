@@ -1,0 +1,11 @@
+# Text is stored with LF line endings in the repository; your own Git settings decide what the working tree uses.
+* text=auto
+*.png binary
+
+# GitHub language statistics: leave out vendored and generated sources.
+firmware/lib/pikascript/** linguist-vendored
+firmware/src/assets_gen.cpp linguist-generated
+firmware/lib/oyster_core/include/oyster_core/lab_profile_gen.h linguist-generated
+simulator/oyster_ui_sim/glyphs.py linguist-generated
+docs/emulator/index.html linguist-generated
+firmware/**/*.h linguist-language=C++
